@@ -5,8 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart Supplement Box Dashboard</title>
   <link rel="stylesheet" href="style.css">
-  <!-- HTML5-QRCode Bibliothek für den Kamera-Scan -->
+  
+  <!-- HTML5-QRCode Bibliothek für Kamera-Scan -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -17,14 +22,14 @@
 
   <main class="container">
 
-    <!-- NEU: Profil- & Name-Auswahl -->
+    <!-- Profil- & Name-Auswahl -->
     <section class="card profile-card">
       <h2>Profil / Box auswählen</h2>
       <div class="profile-input-group">
-        <input type="text" id="user-profile-input" placeholder="Name oder Box-ID eingeben (z. B. Max)" value="Standard">
+        <input type="text" id="user-profile-input" placeholder="Name oder Box-ID eingeben (z. B. Sebi)" value="Sebi">
         <button id="btn-load-profile" class="btn btn-primary btn-inline">Laden</button>
       </div>
-      <p class="active-profile-info">Aktuelles Profil: <strong id="active-profile-name">Standard</strong></p>
+      <p class="active-profile-info">Aktuelles Cloud-Profil: <strong id="active-profile-name">Sebi</strong></p>
     </section>
     
     <!-- Bereich 1: Barcode Scanner & Befüll-Assistent -->
@@ -32,7 +37,7 @@
       <h2>Neues Präparat befüllen</h2>
       <button id="btn-start-scan" class="btn btn-primary">Barcode scannen</button>
       
-      <!-- Video-Fenster für die Smartphone-Kamera -->
+      <!-- Video-Fenster für Smartphone-Kamera -->
       <div id="reader-container" class="hidden">
         <div id="reader"></div>
         <button id="btn-stop-scan" class="btn btn-danger">Abbrechen</button>
@@ -73,7 +78,7 @@
             <h3>Behälter 1</h3>
             <span class="status-led" id="led-1"></span>
           </div>
-          <p class="med-name" id="name-1">Leer</p>
+          <p class="med-name" id="name-1">Lade Cloud-Daten...</p>
           <div class="count-display">
             <span class="count-number" id="count-1">0</span>
             <span class="count-unit">Stk.</span>
@@ -87,7 +92,7 @@
             <h3>Behälter 2</h3>
             <span class="status-led" id="led-2"></span>
           </div>
-          <p class="med-name" id="name-2">Leer</p>
+          <p class="med-name" id="name-2">Lade Cloud-Daten...</p>
           <div class="count-display">
             <span class="count-number" id="count-2">0</span>
             <span class="count-unit">Stk.</span>
@@ -101,7 +106,7 @@
             <h3>Behälter 3</h3>
             <span class="status-led" id="led-3"></span>
           </div>
-          <p class="med-name" id="name-3">Leer</p>
+          <p class="med-name" id="name-3">Lade Cloud-Daten...</p>
           <div class="count-display">
             <span class="count-number" id="count-3">0</span>
             <span class="count-unit">Stk.</span>
@@ -115,7 +120,7 @@
             <h3>Behälter 4</h3>
             <span class="status-led" id="led-4"></span>
           </div>
-          <p class="med-name" id="name-4">Leer</p>
+          <p class="med-name" id="name-4">Lade Cloud-Daten...</p>
           <div class="count-display">
             <span class="count-number" id="count-4">0</span>
             <span class="count-unit">Stk.</span>
