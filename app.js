@@ -1,6 +1,20 @@
-let currentProfile = "Standard";
-let slotsData = {};
+// Eure Firebase-Konfiguration
+const firebaseConfig = {
+  apiKey: "AIzaSyDnwoB8gFLlEOCuLd5IAe6h3SL3rVUjT-k",
+  authDomain: "smartbox-db.firebaseapp.com",
+  databaseURL: "https://smartbox-db-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "smartbox-db",
+  storageBucket: "smartbox-db.firebasestorage.app",
+  messagingSenderId: "956387582755",
+  appId: "1:956387582755:web:5687600ce69a0d0bb9a296"
+};
 
+// Firebase initialisieren
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+let currentProfile = "Sebi";
+let slotsData = {};
 let html5QrCode = null;
 let currentScannedName = "";
 
@@ -16,43 +30,44 @@ const userProfileInput = document.getElementById('user-profile-input');
 const btnLoadProfile = document.getElementById('btn-load-profile');
 const activeProfileName = document.getElementById('active-profile-name');
 
-// Startpunkt: Profil laden & Event-Listener verknüpfen
 document.addEventListener('DOMContentLoaded', () => {
-  // Zuletzt genutztes Profil auslesen
-  currentProfile = localStorage.getItem('smartbox_last_profile') || "Standard";
+  currentProfile = localStorage.getItem('smartbox_last_profile') || "Sebi";
   userProfileInput.value = currentProfile;
   
-  loadProfileData(currentProfile);
+  listenToCloudData(currentProfile);
 
   btnStartScan.addEventListener('click', startCamera);
   btnStopScan.addEventListener('click', stopCamera);
   btnSaveSlot.addEventListener('click', saveProductToSlot);
   btnLoadProfile.addEventListener('click', () => {
-    const newProfile = userProfileInput.value.trim() || "Standard";
-    loadProfileData(newProfile);
+    const newProfile = userProfileInput.value.trim() || "Sebi";
+    currentProfile = newProfile;
+    localStorage.setItem('smartbox_last_profile', currentProfile);
+    listenToCloudData(currentProfile);
   });
 });
 
-// Profil-Daten aus LocalStorage laden
-function loadProfileData(profileName) {
-  currentProfile = profileName;
-  localStorage.setItem('smartbox_last_profile', currentProfile);
-  activeProfileName.innerText = currentProfile;
+// Live-Echtzeit-Verbindung zur Firebase Cloud-Datenbank
+function listenToCloudData(profileName) {
+  activeProfileName.innerText = profileName;
 
-  // Lade spezifische Daten für dieses Profil ODER Standard-Leeres-Board
-  const savedData = localStorage.getItem(`smartbox_profile_${currentProfile}`);
-  if (savedData) {
-    slotsData = JSON.parse(savedData);
-  } else {
-    slotsData = {
-      1: { name: 'Leer', count: 0 },
-      2: { name: 'Leer', count: 0 },
-      3: { name: 'Leer', count: 0 },
-      4: { name: 'Leer', count: 0 }
-    };
-  }
-
-  updateUI();
+  // Höre auf Echtzeit-Änderungen in der Cloud
+  database.ref(`profiles/${profileName}`).on('value', (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      slotsData = data;
+    } else {
+      // Standard-Init falls Profil neu angelegt wird
+      slotsData = {
+        1: { name: 'Leer', count: 0 },
+        2: { name: 'Leer', count: 0 },
+        3: { name: 'Leer', count: 0 },
+        4: { name: 'Leer', count: 0 }
+      };
+      database.ref(`profiles/${profileName}`).set(slotsData);
+    }
+    updateUI();
+  });
 }
 
 // 1. Smartphone-Kamera starten
@@ -106,6 +121,51 @@ function stopCamera() {
   } else {
     readerContainer.classList.add('hidden');
     btnStartScan.classList.remove('hidden');
+  }
+}
+
+// 4. Gescanntes Produkt DIREKT IN DER CLOUD speichern
+function saveProductToSlot() {
+  const selectedSlot = document.getElementById('slot-select').value;
+  const count = parseInt(document.getElementById('pill-count').value) || 0;
+
+  slotsData[selectedSlot] = {
+    name: currentScannedName,
+    count: count
+  };
+
+  // In Firebase Cloud speichern
+  database.ref(`profiles/${currentProfile}`).set(slotsData)
+    .then(() => {
+      scanResult.classList.add('hidden');
+      alert(`In der Cloud gespeichert für [${currentProfile}]: ${currentScannedName} in Behälter ${selectedSlot}!`);
+    })
+    .catch(err => alert("Speicherfehler: " + err));
+}
+
+// 5. Entnahme simulieren
+function simulateTakePill(slotId) {
+  if (slotsData[slotId] && slotsData[slotId].count > 0) {
+    slotsData[slotId].count--;
+    
+    const ledEl = document.getElementById(`led-${slotId}`);
+    ledEl.classList.add('active-green');
+    setTimeout(() => ledEl.classList.remove('active-green'), 1500);
+
+    // Aktualisierte Anzahl in die Cloud schreiben
+    database.ref(`profiles/${currentProfile}`).set(slotsData);
+  } else {
+    alert(`Behälter ${slotId} ist leer!`);
+  }
+}
+
+// 6. UI aktualisieren
+function updateUI() {
+  for (let i = 1; i <= 4; i++) {
+    if (slotsData[i]) {
+      document.getElementById(`name-${i}`).innerText = slotsData[i].name;
+      document.getElementById(`count-${i}`).innerText = slotsData[i].count;
+    }
   }
 }
 
