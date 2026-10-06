@@ -1,4 +1,4 @@
-// Eure Firebase-Konfiguration mit euren Zugangsdaten
+// Eure Firebase-Konfiguration
 const firebaseConfig = {
   apiKey: "AIzaSyDnwoB8gFLlEOCuLd5IAe6h3SL3rVUjT-k",
   authDomain: "smartbox-db.firebaseapp.com",
@@ -30,8 +30,27 @@ const userProfileInput = document.getElementById('user-profile-input');
 const btnLoadProfile = document.getElementById('btn-load-profile');
 const activeProfileName = document.getElementById('active-profile-name');
 
+// Sicheres Auslesen aus LocalStorage (fängt Tracking Prevention Fehler ab)
+function getSafeStorage(key, fallback) {
+  try {
+    return localStorage.getItem(key) || fallback;
+  } catch (e) {
+    console.warn("Storage-Zugriff blockiert, nutze Fallback:", e);
+    return fallback;
+  }
+}
+
+// Sicheres Schreiben in LocalStorage
+function setSafeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    console.warn("Storage-Zugriff blockiert:", e);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  currentProfile = localStorage.getItem('smartbox_last_profile') || "Sebi";
+  currentProfile = getSafeStorage('smartbox_last_profile', 'Sebi');
   userProfileInput.value = currentProfile;
   
   listenToCloudData(currentProfile);
@@ -42,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
   btnLoadProfile.addEventListener('click', () => {
     const newProfile = userProfileInput.value.trim() || "Sebi";
     currentProfile = newProfile;
-    localStorage.setItem('smartbox_last_profile', currentProfile);
+    setSafeStorage('smartbox_last_profile', currentProfile);
     listenToCloudData(currentProfile);
   });
 });
@@ -65,6 +84,8 @@ function listenToCloudData(profileName) {
       database.ref(`profiles/${profileName}`).set(slotsData);
     }
     updateUI();
+  }, (error) => {
+    alert("Firebase Verbindungsfehler: " + error.message);
   });
 }
 
