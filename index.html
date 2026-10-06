@@ -6,6 +6,10 @@
   <title>Smart Supplement Box Dashboard</title>
   <link rel="stylesheet" href="style.css">
   
+  <!-- Firebase SDKs (Zwingend im head geladen, damit firebase vor app.js definiert ist) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
   <!-- HTML5-QRCode Bibliothek für den Barcode/QR-Scan -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
@@ -129,11 +133,7 @@
 
   </main>
 
-  <!-- Firebase SDKs (v9 Compat) -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-  
-  <!-- Hauptlogik -->
+  <!-- Hauptlogik (am Ende des Bodys) -->
   <script src="app.js"></script>
 </body>
 </html>
