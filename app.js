@@ -9,66 +9,84 @@ const firebaseConfig = {
   appId: "1:956387582755:web:5687600ce69a0d0bb9a296"
 };
 
-// Firebase initialisieren
-firebase.initializeApp(firebaseConfig);
-const database = firebase.database();
+// Sichere Initialisierung von Firebase
+let database;
+try {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+  database = firebase.database();
+} catch (e) {
+  console.error("Firebase Init Fehler:", e);
+}
 
 let currentProfile = "Sebi";
 let slotsData = {};
 let html5QrCode = null;
 let currentScannedName = "";
 
-// Element-Referenzen
-const btnStartScan = document.getElementById('btn-start-scan');
-const btnStopScan = document.getElementById('btn-stop-scan');
-const readerContainer = document.getElementById('reader-container');
-const scanResult = document.getElementById('scan-result');
-const productNameEl = document.getElementById('product-name');
-const btnSaveSlot = document.getElementById('btn-save-slot');
-
-const userProfileInput = document.getElementById('user-profile-input');
-const btnLoadProfile = document.getElementById('btn-load-profile');
-const activeProfileName = document.getElementById('active-profile-name');
-
-// Sicheres Auslesen aus LocalStorage (fängt Tracking Prevention Fehler ab)
+// Helper: Verhindert Abstürze durch Tracking Prevention
 function getSafeStorage(key, fallback) {
   try {
-    return localStorage.getItem(key) || fallback;
+    return window.localStorage ? window.localStorage.getItem(key) || fallback : fallback;
   } catch (e) {
-    console.warn("Storage-Zugriff blockiert, nutze Fallback:", e);
+    console.warn("Storage blockiert, verwende Fallback:", fallback);
     return fallback;
   }
 }
 
-// Sicheres Schreiben in LocalStorage
 function setSafeStorage(key, value) {
   try {
-    localStorage.setItem(key, value);
+    if (window.localStorage) {
+      window.localStorage.setItem(key, value);
+    }
   } catch (e) {
-    console.warn("Storage-Zugriff blockiert:", e);
+    console.warn("Storage blockiert, konnte nicht schreiben:", e);
   }
 }
 
+// DOM-Elemente
+let btnStartScan, btnStopScan, readerContainer, scanResult, productNameEl, btnSaveSlot;
+let userProfileInput, btnLoadProfile, activeProfileName;
+
 document.addEventListener('DOMContentLoaded', () => {
+  btnStartScan = document.getElementById('btn-start-scan');
+  btnStopScan = document.getElementById('btn-stop-scan');
+  readerContainer = document.getElementById('reader-container');
+  scanResult = document.getElementById('scan-result');
+  productNameEl = document.getElementById('product-name');
+  btnSaveSlot = document.getElementById('btn-save-slot');
+
+  userProfileInput = document.getElementById('user-profile-input');
+  btnLoadProfile = document.getElementById('btn-load-profile');
+  activeProfileName = document.getElementById('active-profile-name');
+
   currentProfile = getSafeStorage('smartbox_last_profile', 'Sebi');
-  userProfileInput.value = currentProfile;
+  if (userProfileInput) userProfileInput.value = currentProfile;
   
   listenToCloudData(currentProfile);
 
-  btnStartScan.addEventListener('click', startCamera);
-  btnStopScan.addEventListener('click', stopCamera);
-  btnSaveSlot.addEventListener('click', saveProductToSlot);
-  btnLoadProfile.addEventListener('click', () => {
-    const newProfile = userProfileInput.value.trim() || "Sebi";
-    currentProfile = newProfile;
-    setSafeStorage('smartbox_last_profile', currentProfile);
-    listenToCloudData(currentProfile);
-  });
+  if (btnStartScan) btnStartScan.addEventListener('click', startCamera);
+  if (btnStopScan) btnStopScan.addEventListener('click', stopCamera);
+  if (btnSaveSlot) btnSaveSlot.addEventListener('click', saveProductToSlot);
+  if (btnLoadProfile) {
+    btnLoadProfile.addEventListener('click', () => {
+      const newProfile = userProfileInput.value.trim() || "Sebi";
+      currentProfile = newProfile;
+      setSafeStorage('smartbox_last_profile', currentProfile);
+      listenToCloudData(currentProfile);
+    });
+  }
 });
 
 // Live-Echtzeit-Verbindung zur Firebase Cloud-Datenbank
 function listenToCloudData(profileName) {
-  activeProfileName.innerText = profileName;
+  if (activeProfileName) activeProfileName.innerText = profileName;
+
+  if (!database) {
+    alert("Firebase konnte nicht geladen werden.");
+    return;
+  }
 
   database.ref(`profiles/${profileName}`).on('value', (snapshot) => {
     const data = snapshot.val();
@@ -85,11 +103,11 @@ function listenToCloudData(profileName) {
     }
     updateUI();
   }, (error) => {
-    alert("Firebase Verbindungsfehler: " + error.message);
+    alert("Firebase Fehler: " + error.message);
   });
 }
 
-// 1. Smartphone-Kamera starten
+// Kamera-Logik
 function startCamera() {
   readerContainer.classList.remove('hidden');
   scanResult.classList.add('hidden');
@@ -107,7 +125,6 @@ function startCamera() {
   });
 }
 
-// 2. Barcode wurde von der Kamera erkannt
 function onBarcodeScanned(decodedText) {
   stopCamera();
   
@@ -130,7 +147,6 @@ function onBarcodeScanned(decodedText) {
     });
 }
 
-// 3. Kamera stoppen
 function stopCamera() {
   if (html5QrCode) {
     html5QrCode.stop().then(() => {
@@ -143,7 +159,7 @@ function stopCamera() {
   }
 }
 
-// 4. Gescanntes Produkt DIREKT IN DER CLOUD speichern
+// In der Cloud speichern
 function saveProductToSlot() {
   const selectedSlot = document.getElementById('slot-select').value;
   const count = parseInt(document.getElementById('pill-count').value) || 0;
@@ -161,14 +177,16 @@ function saveProductToSlot() {
     .catch(err => alert("Speicherfehler: " + err));
 }
 
-// 5. Entnahme simulieren
+// Entnahme simulieren
 function simulateTakePill(slotId) {
   if (slotsData[slotId] && slotsData[slotId].count > 0) {
     slotsData[slotId].count--;
     
     const ledEl = document.getElementById(`led-${slotId}`);
-    ledEl.classList.add('active-green');
-    setTimeout(() => ledEl.classList.remove('active-green'), 1500);
+    if (ledEl) {
+      ledEl.classList.add('active-green');
+      setTimeout(() => ledEl.classList.remove('active-green'), 1500);
+    }
 
     database.ref(`profiles/${currentProfile}`).set(slotsData);
   } else {
@@ -176,12 +194,14 @@ function simulateTakePill(slotId) {
   }
 }
 
-// 6. UI aktualisieren
+// UI aktualisieren
 function updateUI() {
   for (let i = 1; i <= 4; i++) {
     if (slotsData[i]) {
-      document.getElementById(`name-${i}`).innerText = slotsData[i].name;
-      document.getElementById(`count-${i}`).innerText = slotsData[i].count;
+      const nameEl = document.getElementById(`name-${i}`);
+      const countEl = document.getElementById(`count-${i}`);
+      if (nameEl) nameEl.innerText = slotsData[i].name;
+      if (countEl) countEl.innerText = slotsData[i].count;
     }
   }
 }
