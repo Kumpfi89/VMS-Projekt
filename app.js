@@ -1,4 +1,4 @@
-// Eure Firebase-Konfiguration
+// Eure Firebase-Konfiguration mit euren Zugangsdaten
 const firebaseConfig = {
   apiKey: "AIzaSyDnwoB8gFLlEOCuLd5IAe6h3SL3rVUjT-k",
   authDomain: "smartbox-db.firebaseapp.com",
@@ -51,13 +51,11 @@ document.addEventListener('DOMContentLoaded', () => {
 function listenToCloudData(profileName) {
   activeProfileName.innerText = profileName;
 
-  // Höre auf Echtzeit-Änderungen in der Cloud
   database.ref(`profiles/${profileName}`).on('value', (snapshot) => {
     const data = snapshot.val();
     if (data) {
       slotsData = data;
     } else {
-      // Standard-Init falls Profil neu angelegt wird
       slotsData = {
         1: { name: 'Leer', count: 0 },
         2: { name: 'Leer', count: 0 },
@@ -134,7 +132,6 @@ function saveProductToSlot() {
     count: count
   };
 
-  // In Firebase Cloud speichern
   database.ref(`profiles/${currentProfile}`).set(slotsData)
     .then(() => {
       scanResult.classList.add('hidden');
@@ -152,7 +149,6 @@ function simulateTakePill(slotId) {
     ledEl.classList.add('active-green');
     setTimeout(() => ledEl.classList.remove('active-green'), 1500);
 
-    // Aktualisierte Anzahl in die Cloud schreiben
     database.ref(`profiles/${currentProfile}`).set(slotsData);
   } else {
     alert(`Behälter ${slotId} ist leer!`);
@@ -166,48 +162,5 @@ function updateUI() {
       document.getElementById(`name-${i}`).innerText = slotsData[i].name;
       document.getElementById(`count-${i}`).innerText = slotsData[i].count;
     }
-  }
-}
-
-// 4. Gescanntes Produkt im AKTUELLEN PROFIL speichern
-function saveProductToSlot() {
-  const selectedSlot = document.getElementById('slot-select').value;
-  const count = parseInt(document.getElementById('pill-count').value) || 0;
-
-  slotsData[selectedSlot] = {
-    name: currentScannedName,
-    count: count
-  };
-
-  // Unter dem spezifischen Profil-Namen speichern
-  localStorage.setItem(`smartbox_profile_${currentProfile}`, JSON.stringify(slotsData));
-
-  scanResult.classList.add('hidden');
-  updateUI();
-  
-  alert(`Erfolgreich für [${currentProfile}]: ${currentScannedName} in Behälter ${selectedSlot} gespeichert!`);
-}
-
-// 5. Entnahme simulieren
-function simulateTakePill(slotId) {
-  if (slotsData[slotId].count > 0) {
-    slotsData[slotId].count--;
-    
-    const ledEl = document.getElementById(`led-${slotId}`);
-    ledEl.classList.add('active-green');
-    setTimeout(() => ledEl.classList.remove('active-green'), 1500);
-
-    localStorage.setItem(`smartbox_profile_${currentProfile}`, JSON.stringify(slotsData));
-    updateUI();
-  } else {
-    alert(`Behälter ${slotId} ist leer!`);
-  }
-}
-
-// 6. UI aktualisieren
-function updateUI() {
-  for (let i = 1; i <= 4; i++) {
-    document.getElementById(`name-${i}`).innerText = slotsData[i].name;
-    document.getElementById(`count-${i}`).innerText = slotsData[i].count;
   }
 }
