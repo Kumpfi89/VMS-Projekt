@@ -1,0 +1,153 @@
+let currentProfile = "Standard";
+let slotsData = {};
+
+let html5QrCode = null;
+let currentScannedName = "";
+
+// Element-Referenzen
+const btnStartScan = document.getElementById('btn-start-scan');
+const btnStopScan = document.getElementById('btn-stop-scan');
+const readerContainer = document.getElementById('reader-container');
+const scanResult = document.getElementById('scan-result');
+const productNameEl = document.getElementById('product-name');
+const btnSaveSlot = document.getElementById('btn-save-slot');
+
+const userProfileInput = document.getElementById('user-profile-input');
+const btnLoadProfile = document.getElementById('btn-load-profile');
+const activeProfileName = document.getElementById('active-profile-name');
+
+// Startpunkt: Profil laden & Event-Listener verknüpfen
+document.addEventListener('DOMContentLoaded', () => {
+  // Zuletzt genutztes Profil auslesen
+  currentProfile = localStorage.getItem('smartbox_last_profile') || "Standard";
+  userProfileInput.value = currentProfile;
+  
+  loadProfileData(currentProfile);
+
+  btnStartScan.addEventListener('click', startCamera);
+  btnStopScan.addEventListener('click', stopCamera);
+  btnSaveSlot.addEventListener('click', saveProductToSlot);
+  btnLoadProfile.addEventListener('click', () => {
+    const newProfile = userProfileInput.value.trim() || "Standard";
+    loadProfileData(newProfile);
+  });
+});
+
+// Profil-Daten aus LocalStorage laden
+function loadProfileData(profileName) {
+  currentProfile = profileName;
+  localStorage.setItem('smartbox_last_profile', currentProfile);
+  activeProfileName.innerText = currentProfile;
+
+  // Lade spezifische Daten für dieses Profil ODER Standard-Leeres-Board
+  const savedData = localStorage.getItem(`smartbox_profile_${currentProfile}`);
+  if (savedData) {
+    slotsData = JSON.parse(savedData);
+  } else {
+    slotsData = {
+      1: { name: 'Leer', count: 0 },
+      2: { name: 'Leer', count: 0 },
+      3: { name: 'Leer', count: 0 },
+      4: { name: 'Leer', count: 0 }
+    };
+  }
+
+  updateUI();
+}
+
+// 1. Smartphone-Kamera starten
+function startCamera() {
+  readerContainer.classList.remove('hidden');
+  scanResult.classList.add('hidden');
+  btnStartScan.classList.add('hidden');
+
+  html5QrCode = new Html5Qrcode("reader");
+  
+  html5QrCode.start(
+    { facingMode: "environment" },
+    { fps: 10, qrbox: { width: 250, height: 150 } },
+    onBarcodeScanned
+  ).catch(err => {
+    alert("Kamera-Fehler: " + err);
+    stopCamera();
+  });
+}
+
+// 2. Barcode wurde von der Kamera erkannt
+function onBarcodeScanned(decodedText) {
+  stopCamera();
+  
+  productNameEl.innerText = "Lade Produktdaten...";
+  scanResult.classList.remove('hidden');
+
+  fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`)
+    .then(res => res.json())
+    .then(data => {
+      if (data.product && data.product.product_name) {
+        currentScannedName = data.product.product_name;
+      } else {
+        currentScannedName = "Präparat (EAN: " + decodedText + ")";
+      }
+      productNameEl.innerText = currentScannedName;
+    })
+    .catch(() => {
+      currentScannedName = "Präparat (EAN: " + decodedText + ")";
+      productNameEl.innerText = currentScannedName;
+    });
+}
+
+// 3. Kamera stoppen
+function stopCamera() {
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => {
+      readerContainer.classList.add('hidden');
+      btnStartScan.classList.remove('hidden');
+    }).catch(() => {});
+  } else {
+    readerContainer.classList.add('hidden');
+    btnStartScan.classList.remove('hidden');
+  }
+}
+
+// 4. Gescanntes Produkt im AKTUELLEN PROFIL speichern
+function saveProductToSlot() {
+  const selectedSlot = document.getElementById('slot-select').value;
+  const count = parseInt(document.getElementById('pill-count').value) || 0;
+
+  slotsData[selectedSlot] = {
+    name: currentScannedName,
+    count: count
+  };
+
+  // Unter dem spezifischen Profil-Namen speichern
+  localStorage.setItem(`smartbox_profile_${currentProfile}`, JSON.stringify(slotsData));
+
+  scanResult.classList.add('hidden');
+  updateUI();
+  
+  alert(`Erfolgreich für [${currentProfile}]: ${currentScannedName} in Behälter ${selectedSlot} gespeichert!`);
+}
+
+// 5. Entnahme simulieren
+function simulateTakePill(slotId) {
+  if (slotsData[slotId].count > 0) {
+    slotsData[slotId].count--;
+    
+    const ledEl = document.getElementById(`led-${slotId}`);
+    ledEl.classList.add('active-green');
+    setTimeout(() => ledEl.classList.remove('active-green'), 1500);
+
+    localStorage.setItem(`smartbox_profile_${currentProfile}`, JSON.stringify(slotsData));
+    updateUI();
+  } else {
+    alert(`Behälter ${slotId} ist leer!`);
+  }
+}
+
+// 6. UI aktualisieren
+function updateUI() {
+  for (let i = 1; i <= 4; i++) {
+    document.getElementById(`name-${i}`).innerText = slotsData[i].name;
+    document.getElementById(`count-${i}`).innerText = slotsData[i].count;
+  }
+}

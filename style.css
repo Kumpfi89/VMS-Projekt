@@ -1,0 +1,150 @@
+:root {
+  --bg-color: #f4f6f9;
+  --card-bg: #ffffff;
+  --primary-color: #0066cc;
+  --success-color: #28a745;
+  --danger-color: #dc3545;
+  --text-color: #333333;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  margin: 0;
+  padding: 0;
+}
+
+header {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+header h1 { margin: 0; font-size: 1.4rem; }
+header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.hidden { display: none !important; }
+
+/* Profil-Eingabe Styling */
+.profile-input-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.profile-input-group input {
+  flex: 1;
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+  font-size: 0.95rem;
+}
+
+.btn-inline {
+  width: auto !important;
+  margin-top: 0 !important;
+  padding: 0.6rem 1.2rem !important;
+}
+
+.active-profile-info {
+  font-size: 0.85rem;
+  color: #555;
+  margin: 0.5rem 0 0 0;
+}
+
+/* Buttons */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.btn-primary { background: var(--primary-color); color: white; }
+.btn-success { background: var(--success-color); color: white; }
+.btn-danger { background: var(--danger-color); color: white; }
+.btn-small { padding: 0.4rem; font-size: 0.8rem; background: #e9ecef; color: #495057; }
+
+/* Grid der 4 Behälter */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.slot-card {
+  background: white;
+  border-radius: 10px;
+  padding: 0.8rem;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+}
+
+.slot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.slot-header h3 { margin: 0; font-size: 0.9rem; color: #666; }
+
+/* Status-LED Symbol */
+.status-led {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #ccc;
+}
+
+.status-led.active-green {
+  background-color: var(--success-color);
+  box-shadow: 0 0 8px var(--success-color);
+}
+
+.med-name {
+  font-weight: bold;
+  font-size: 1.05rem;
+  margin: 0.5rem 0;
+  min-height: 2.2em;
+}
+
+.count-display { margin-bottom: 0.5rem; }
+
+.count-number {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: var(--primary-color);
+}
+
+.count-unit { font-size: 0.85rem; color: #777; }
+
+.assign-group {
+  margin: 0.8rem 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.assign-group label { font-size: 0.85rem; margin-bottom: 0.2rem; }
+.assign-group select, .assign-group input { padding: 0.5rem; border-radius: 6px; border: 1px solid #ccc; }

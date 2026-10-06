@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Supplement Box Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- HTML5-QRCode Bibliothek für den Kamera-Scan -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+</head>
+<body>
+
+  <header>
+    <h1>Smart Box Dashboard</h1>
+    <p>OTH Regensburg - Vertiefung Mess- & Sensortechnik</p>
+  </header>
+
+  <main class="container">
+
+    <!-- NEU: Profil- & Name-Auswahl -->
+    <section class="card profile-card">
+      <h2>Profil / Box auswählen</h2>
+      <div class="profile-input-group">
+        <input type="text" id="user-profile-input" placeholder="Name oder Box-ID eingeben (z. B. Max)" value="Standard">
+        <button id="btn-load-profile" class="btn btn-primary btn-inline">Laden</button>
+      </div>
+      <p class="active-profile-info">Aktuelles Profil: <strong id="active-profile-name">Standard</strong></p>
+    </section>
+    
+    <!-- Bereich 1: Barcode Scanner & Befüll-Assistent -->
+    <section class="card scanner-card">
+      <h2>Neues Präparat befüllen</h2>
+      <button id="btn-start-scan" class="btn btn-primary">Barcode scannen</button>
+      
+      <!-- Video-Fenster für die Smartphone-Kamera -->
+      <div id="reader-container" class="hidden">
+        <div id="reader"></div>
+        <button id="btn-stop-scan" class="btn btn-danger">Abbrechen</button>
+      </div>
+
+      <!-- Anzeigebereich für gescanntes Produkt -->
+      <div id="scan-result" class="hidden">
+        <p class="scan-label">Gefundenes Produkt:</p>
+        <p id="product-name" class="product-title">-</p>
+        
+        <div class="assign-group">
+          <label for="slot-select">Behälter zuweisen:</label>
+          <select id="slot-select">
+            <option value="1">Behälter 1</option>
+            <option value="2">Behälter 2</option>
+            <option value="3">Behälter 3</option>
+            <option value="4">Behälter 4</option>
+          </select>
+        </div>
+
+        <div class="assign-group">
+          <label for="pill-count">Anzahl Tabletten:</label>
+          <input type="number" id="pill-count" value="30" min="1">
+        </div>
+
+        <button id="btn-save-slot" class="btn btn-success">Behälter befüllen & speichern</button>
+      </div>
+    </section>
+
+    <!-- Bereich 2: Das 4-Kacheln Dashboard der Box -->
+    <section class="dashboard">
+      <h2>Übersicht der Behälter</h2>
+      <div class="grid">
+        
+        <!-- Behälter 1 -->
+        <div class="slot-card" id="slot-card-1">
+          <div class="slot-header">
+            <h3>Behälter 1</h3>
+            <span class="status-led" id="led-1"></span>
+          </div>
+          <p class="med-name" id="name-1">Leer</p>
+          <div class="count-display">
+            <span class="count-number" id="count-1">0</span>
+            <span class="count-unit">Stk.</span>
+          </div>
+          <button class="btn btn-small" onclick="simulateTakePill(1)">1x Entnahme (Test)</button>
+        </div>
+
+        <!-- Behälter 2 -->
+        <div class="slot-card" id="slot-card-2">
+          <div class="slot-header">
+            <h3>Behälter 2</h3>
+            <span class="status-led" id="led-2"></span>
+          </div>
+          <p class="med-name" id="name-2">Leer</p>
+          <div class="count-display">
+            <span class="count-number" id="count-2">0</span>
+            <span class="count-unit">Stk.</span>
+          </div>
+          <button class="btn btn-small" onclick="simulateTakePill(2)">1x Entnahme (Test)</button>
+        </div>
+
+        <!-- Behälter 3 -->
+        <div class="slot-card" id="slot-card-3">
+          <div class="slot-header">
+            <h3>Behälter 3</h3>
+            <span class="status-led" id="led-3"></span>
+          </div>
+          <p class="med-name" id="name-3">Leer</p>
+          <div class="count-display">
+            <span class="count-number" id="count-3">0</span>
+            <span class="count-unit">Stk.</span>
+          </div>
+          <button class="btn btn-small" onclick="simulateTakePill(3)">1x Entnahme (Test)</button>
+        </div>
+
+        <!-- Behälter 4 -->
+        <div class="slot-card" id="slot-card-4">
+          <div class="slot-header">
+            <h3>Behälter 4</h3>
+            <span class="status-led" id="led-4"></span>
+          </div>
+          <p class="med-name" id="name-4">Leer</p>
+          <div class="count-display">
+            <span class="count-number" id="count-4">0</span>
+            <span class="count-unit">Stk.</span>
+          </div>
+          <button class="btn btn-small" onclick="simulateTakePill(4)">1x Entnahme (Test)</button>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
