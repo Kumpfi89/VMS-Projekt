@@ -6,12 +6,8 @@
   <title>Smart Supplement Box Dashboard</title>
   <link rel="stylesheet" href="style.css">
   
-  <!-- HTML5-QRCode Bibliothek für Kamera-Scan -->
+  <!-- HTML5-QRCode Bibliothek für den Barcode/QR-Scan -->
   <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -37,7 +33,7 @@
       <h2>Neues Präparat befüllen</h2>
       <button id="btn-start-scan" class="btn btn-primary">Barcode scannen</button>
       
-      <!-- Video-Fenster für Smartphone-Kamera -->
+      <!-- Video-Fenster für die Smartphone-Kamera -->
       <div id="reader-container" class="hidden">
         <div id="reader"></div>
         <button id="btn-stop-scan" class="btn btn-danger">Abbrechen</button>
@@ -133,6 +129,11 @@
 
   </main>
 
+  <!-- Firebase SDKs (v9 Compat) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  
+  <!-- Hauptlogik -->
   <script src="app.js"></script>
 </body>
 </html>
