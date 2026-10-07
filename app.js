@@ -107,7 +107,7 @@ function listenToCloudData(profileName) {
   });
 }
 
-// Kamera-Logik
+// Kamera mit optimiertem Scan-Bereich für EAN-Barcodes starten
 function startCamera() {
   readerContainer.classList.remove('hidden');
   scanResult.classList.add('hidden');
@@ -115,9 +115,15 @@ function startCamera() {
 
   html5QrCode = new Html5Qrcode("reader");
   
+  const config = {
+    fps: 15,                             // Höhere Framerate für schnellere Fokussierung
+    qrbox: { width: 300, height: 180 }, // Breiterer Kasten speziell für lange EAN-Barcodes
+    aspectRatio: 1.0
+  };
+
   html5QrCode.start(
     { facingMode: "environment" },
-    { fps: 10, qrbox: { width: 250, height: 150 } },
+    config,
     onBarcodeScanned
   ).catch(err => {
     alert("Kamera-Fehler: " + err);
@@ -125,24 +131,44 @@ function startCamera() {
   });
 }
 
+// Barcode erkannt -> Ausführliche Namensprüfung
 function onBarcodeScanned(decodedText) {
   stopCamera();
   
-  productNameEl.innerText = "Lade Produktdaten...";
+  productNameEl.innerText = "Lade Produktdaten für EAN " + decodedText + "...";
   scanResult.classList.remove('hidden');
 
   fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`)
     .then(res => res.json())
     .then(data => {
-      if (data.product && data.product.product_name) {
-        currentScannedName = data.product.product_name;
-      } else {
-        currentScannedName = "Präparat (EAN: " + decodedText + ")";
+      let detectedName = "";
+
+      if (data.status === 1 && data.product) {
+        const p = data.product;
+        
+        // 1. Namen und Marke zusammenstellen
+        const baseName = p.product_name_de || p.product_name || p.generic_name_de || p.generic_name;
+        const brand = p.brands ? p.brands.split(',')[0].trim() : "";
+
+        if (baseName && brand) {
+          detectedName = `${brand} - ${baseName}`;
+        } else if (baseName) {
+          detectedName = baseName;
+        } else if (brand) {
+          detectedName = `${brand} Präparat`;
+        }
       }
+
+      // Falls in der Datenbank kein Name hinterlegt ist:
+      if (!detectedName) {
+        detectedName = `Präparat (EAN: ${decodedText})`;
+      }
+
+      currentScannedName = detectedName;
       productNameEl.innerText = currentScannedName;
     })
     .catch(() => {
-      currentScannedName = "Präparat (EAN: " + decodedText + ")";
+      currentScannedName = `Präparat (EAN: ${decodedText})`;
       productNameEl.innerText = currentScannedName;
     });
 }
@@ -159,10 +185,18 @@ function stopCamera() {
   }
 }
 
-// In der Cloud speichern
+// In der Cloud speichern (mit Fallback-Namensabfrage)
 function saveProductToSlot() {
   const selectedSlot = document.getElementById('slot-select').value;
   const count = parseInt(document.getElementById('pill-count').value) || 0;
+
+  // Falls der Name nur aus der EAN besteht, Name abfragen:
+  if (currentScannedName.includes("EAN:")) {
+    const customName = prompt("Produktname in der Datenbank nicht gefunden. Wie heißt das Präparat?", "");
+    if (customName && customName.trim() !== "") {
+      currentScannedName = customName.trim();
+    }
+  }
 
   slotsData[selectedSlot] = {
     name: currentScannedName,
