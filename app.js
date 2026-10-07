@@ -211,25 +211,30 @@ function saveProductToSlot() {
     .catch(err => alert("Speicherfehler: " + err));
 }
 
-// Entnahme simulieren
+// 5. Entnahme simulieren (Setzt den Namen auf "Leer", sobald count == 0)
 function simulateTakePill(slotId) {
   if (slotsData[slotId] && slotsData[slotId].count > 0) {
     slotsData[slotId].count--;
     
+    // Wenn der Stand auf 0 fällt, wird der Produktname wieder auf "Leer" zurückgesetzt
+    if (slotsData[slotId].count === 0) {
+      slotsData[slotId].name = "Leer";
+    }
+
     const ledEl = document.getElementById(`led-${slotId}`);
     if (ledEl) {
       ledEl.classList.add('active-green');
       setTimeout(() => ledEl.classList.remove('active-green'), 1500);
     }
 
+    // In Firebase aktualisieren
     database.ref(`profiles/${currentProfile}`).set(slotsData);
   } else {
-    alert(`Behälter ${slotId} ist leer!`);
+    alert(`Behälter ${slotId} ist bereits leer!`);
   }
 }
 
-// UI aktualisieren
-// 6. UI aktualisieren (Farben rot/grün basierend auf Stückzahl)
+// 6. UI aktualisieren
 function updateUI() {
   for (let i = 1; i <= 4; i++) {
     if (slotsData[i]) {
@@ -239,21 +244,22 @@ function updateUI() {
       const ledEl = document.getElementById(`led-${i}`);
 
       const count = slotsData[i].count || 0;
+      
+      // Falls count == 0 ist, Name als "Leer" anzeigen
+      const displayName = (count === 0) ? "Leer" : (slotsData[i].name || "Leer");
 
-      if (nameEl) nameEl.innerText = slotsData[i].name;
+      if (nameEl) nameEl.innerText = displayName;
       if (countEl) countEl.innerText = count;
 
-      // Farbanpassung basierend auf der Stückzahl
+      // Farbanpassung: >0 Stk. -> Grün, 0 Stk. -> Rot
       if (cardEl && ledEl) {
         if (count > 0) {
-          // Befüllt (mindestens 1 Stück) -> Grün
           cardEl.classList.remove('empty-slot');
           cardEl.classList.add('filled-slot');
 
           ledEl.classList.remove('red');
           ledEl.classList.add('green');
         } else {
-          // Leer (0 Stück) -> Rot
           cardEl.classList.remove('filled-slot');
           cardEl.classList.add('empty-slot');
 
