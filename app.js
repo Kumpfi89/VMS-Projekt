@@ -229,13 +229,38 @@ function simulateTakePill(slotId) {
 }
 
 // UI aktualisieren
+// 6. UI aktualisieren (Farben rot/grün basierend auf Stückzahl)
 function updateUI() {
   for (let i = 1; i <= 4; i++) {
     if (slotsData[i]) {
       const nameEl = document.getElementById(`name-${i}`);
       const countEl = document.getElementById(`count-${i}`);
+      const cardEl = document.getElementById(`slot-card-${i}`);
+      const ledEl = document.getElementById(`led-${i}`);
+
+      const count = slotsData[i].count || 0;
+
       if (nameEl) nameEl.innerText = slotsData[i].name;
-      if (countEl) countEl.innerText = slotsData[i].count;
+      if (countEl) countEl.innerText = count;
+
+      // Farbanpassung basierend auf der Stückzahl
+      if (cardEl && ledEl) {
+        if (count > 0) {
+          // Befüllt (mindestens 1 Stück) -> Grün
+          cardEl.classList.remove('empty-slot');
+          cardEl.classList.add('filled-slot');
+
+          ledEl.classList.remove('red');
+          ledEl.classList.add('green');
+        } else {
+          // Leer (0 Stück) -> Rot
+          cardEl.classList.remove('filled-slot');
+          cardEl.classList.add('empty-slot');
+
+          ledEl.classList.remove('green');
+          ledEl.classList.add('red');
+        }
+      }
     }
   }
 }

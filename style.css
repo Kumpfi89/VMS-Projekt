@@ -148,3 +148,34 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
 
 .assign-group label { font-size: 0.85rem; margin-bottom: 0.2rem; }
 .assign-group select, .assign-group input { padding: 0.5rem; border-radius: 6px; border: 1px solid #ccc; }
+
+/* Dynamische Status-Farben für Behälter-Kacheln */
+.slot-card.empty-slot {
+  border-left: 5px solid #e74c3c;
+  background-color: #fdf2f2;
+}
+
+.slot-card.filled-slot {
+  border-left: 5px solid #2ecc71;
+  background-color: #f2f9f5;
+}
+
+/* Status-LEDs */
+.status-led {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  background-color: #ccc;
+  transition: background-color 0.3s ease;
+}
+
+.status-led.red {
+  background-color: #e74c3c;
+  box-shadow: 0 0 8px rgba(231, 76, 60, 0.6);
+}
+
+.status-led.green {
+  background-color: #2ecc71;
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
+}
