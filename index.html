@@ -37,10 +37,10 @@
     <section class="card scanner-card">
       <h2>Neues Supplement hinzufügen</h2>
       
-      <!-- Buttons für Kamera oder Tastatur-Eingabe -->
-      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-        <button id="btn-start-scan" class="btn btn-primary" style="flex: 1;">Barcode scannen</button>
-        <button id="btn-manual-entry" class="btn btn-small" style="flex: 1; margin-top: 0.5rem;">Code manuell eingeben</button>
+      <!-- Wahlmöglichkeiten für den Nutzer -->
+      <div class="action-buttons" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+        <button id="btn-start-scan" class="btn btn-primary" style="flex: 1; min-width: 140px;">📷 Barcode scannen</button>
+        <button id="btn-manual-entry" class="btn btn-primary" style="flex: 1; min-width: 140px; background-color: #3498db;">✏️ Name manuell eingeben</button>
       </div>
       
       <!-- Video-Fenster für die Smartphone-Kamera -->
@@ -49,12 +49,12 @@
         <button id="btn-stop-scan" class="btn btn-danger">Abbrechen</button>
       </div>
 
-      <!-- Anzeigebereich für gescanntes / eingegebenes Produkt -->
+      <!-- Anzeigebereich für gescanntes / manuell eingegebenes Produkt -->
       <div id="scan-result" class="hidden">
-        <p class="scan-label">Gefundenes Produkt:</p>
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
-          <p id="product-name" class="product-title" style="margin: 0;">-</p>
-          <button id="btn-edit-name" class="btn btn-small" style="width: auto; padding: 0.3rem 0.6rem;" title="Name bearbeiten">✏️</button>
+        <p class="scan-label">Ausgewähltes Produkt:</p>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem;">
+          <p id="product-name" class="product-title" style="margin: 0; font-weight: bold; font-size: 1.2rem;">-</p>
+          <button id="btn-edit-name" class="btn btn-small" style="width: auto; padding: 0.4rem 0.8rem;" title="Name anpassen">✏️ Ändern</button>
         </div>
         
         <div class="assign-group">
@@ -72,7 +72,7 @@
           <input type="number" id="pill-count" value="30" min="1">
         </div>
 
-        <button id="btn-save-slot" class="btn btn-success">Behälter befüllen & speichern</button>
+        <button id="btn-save-slot" class="btn btn-success" style="margin-top: 1rem;">Behälter befüllen & speichern</button>
       </div>
     </section>
 

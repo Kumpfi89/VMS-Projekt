@@ -48,6 +48,7 @@ function setSafeStorage(key, value) {
 // DOM-Elemente
 let btnStartScan, btnStopScan, readerContainer, scanResult, productNameEl, btnSaveSlot;
 let userProfileInput, btnLoadProfile, activeProfileName;
+let btnManualEntry, btnEditName;
 
 document.addEventListener('DOMContentLoaded', () => {
   btnStartScan = document.getElementById('btn-start-scan');
@@ -61,6 +62,9 @@ document.addEventListener('DOMContentLoaded', () => {
   btnLoadProfile = document.getElementById('btn-load-profile');
   activeProfileName = document.getElementById('active-profile-name');
 
+  btnManualEntry = document.getElementById('btn-manual-entry');
+  btnEditName = document.getElementById('btn-edit-name');
+
   currentProfile = getSafeStorage('smartbox_last_profile', 'Sebi');
   if (userProfileInput) userProfileInput.value = currentProfile;
   
@@ -69,12 +73,37 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnStartScan) btnStartScan.addEventListener('click', startCamera);
   if (btnStopScan) btnStopScan.addEventListener('click', stopCamera);
   if (btnSaveSlot) btnSaveSlot.addEventListener('click', saveProductToSlot);
+  
   if (btnLoadProfile) {
     btnLoadProfile.addEventListener('click', () => {
       const newProfile = userProfileInput.value.trim() || "Sebi";
       currentProfile = newProfile;
       setSafeStorage('smartbox_last_profile', currentProfile);
       listenToCloudData(currentProfile);
+    });
+  }
+
+  // 1. Direkt-Option: Name manuell ohne Barcode eingeben
+  if (btnManualEntry) {
+    btnManualEntry.addEventListener('click', () => {
+      stopCamera();
+      const inputName = prompt("Name des Präparats / Nahrungsergänzungsmittels eingeben:", "");
+      if (inputName && inputName.trim() !== "") {
+        currentScannedName = inputName.trim();
+        productNameEl.innerText = currentScannedName;
+        scanResult.classList.remove('hidden');
+      }
+    });
+  }
+
+  // 2. Option: Aktuellen Namen korrigieren/anpassen
+  if (btnEditName) {
+    btnEditName.addEventListener('click', () => {
+      const newName = prompt("Produktname anpassen:", currentScannedName);
+      if (newName && newName.trim() !== "") {
+        currentScannedName = newName.trim();
+        productNameEl.innerText = currentScannedName;
+      }
     });
   }
 });
@@ -107,18 +136,16 @@ function listenToCloudData(profileName) {
   });
 }
 
-// Kamera mit extrem hoher Kompatibilität starten
+// Kamera-Logik starten
 function startCamera() {
   readerContainer.classList.remove('hidden');
   scanResult.classList.add('hidden');
-  btnStartScan.classList.add('hidden');
 
   html5QrCode = new Html5Qrcode("reader");
   
   const scanConfig = {
-    fps: 20,                             // Hohe Erkennungsrate pro Sekunde
+    fps: 20,
     qrbox: function(viewfinderWidth, viewfinderHeight) {
-      // Breites Scan-Fenster für kleine EAN/PZN Barcodes
       const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
       return {
         width: Math.floor(viewfinderWidth * 0.85),
@@ -128,13 +155,11 @@ function startCamera() {
     aspectRatio: 1.0
   };
 
-  // Rückkamera starten
   html5QrCode.start(
     { facingMode: "environment" },
     scanConfig,
     onBarcodeScanned
   ).then(() => {
-    // Falls das Smartphone Zoom unterstützt, leicht heranzoomen (verhindert unscharfe Nahaufnahmen)
     try {
       const track = html5QrCode.getRunningTrack();
       const capabilities = track.getCapabilities();
@@ -143,7 +168,7 @@ function startCamera() {
         track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
       }
     } catch (e) {
-      console.log("Zoom nicht unterstützt oder geblockt:", e);
+      console.log("Zoom nicht unterstützt:", e);
     }
   }).catch(err => {
     alert("Kamera-Fehler: " + err);
@@ -151,11 +176,11 @@ function startCamera() {
   });
 }
 
-// Barcode erkannt -> Ausführliche Namensprüfung
+// Barcode erkannt -> Produktsuche mit Fallback
 function onBarcodeScanned(decodedText) {
   stopCamera();
   
-  productNameEl.innerText = "Lade Produktdaten für EAN " + decodedText + "...";
+  productNameEl.innerText = "Lade Produktdaten...";
   scanResult.classList.remove('hidden');
 
   fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`)
@@ -165,8 +190,6 @@ function onBarcodeScanned(decodedText) {
 
       if (data.status === 1 && data.product) {
         const p = data.product;
-        
-        // 1. Namen und Marke zusammenstellen
         const baseName = p.product_name_de || p.product_name || p.generic_name_de || p.generic_name;
         const brand = p.brands ? p.brands.split(',')[0].trim() : "";
 
@@ -179,9 +202,16 @@ function onBarcodeScanned(decodedText) {
         }
       }
 
-      // Falls in der Datenbank kein Name hinterlegt ist:
+      // Falls Barcode nicht in Open Food Facts gefunden wurde
       if (!detectedName) {
         detectedName = `Präparat (EAN: ${decodedText})`;
+        setTimeout(() => {
+          const manualFix = prompt(`Barcode ${decodedText} nicht in der Datenbank gefunden. Wie heißt das Produkt?`, "");
+          if (manualFix && manualFix.trim() !== "") {
+            currentScannedName = manualFix.trim();
+            productNameEl.innerText = currentScannedName;
+          }
+        }, 300);
       }
 
       currentScannedName = detectedName;
@@ -197,25 +227,20 @@ function stopCamera() {
   if (html5QrCode) {
     html5QrCode.stop().then(() => {
       readerContainer.classList.add('hidden');
-      btnStartScan.classList.remove('hidden');
     }).catch(() => {});
   } else {
     readerContainer.classList.add('hidden');
-    btnStartScan.classList.remove('hidden');
   }
 }
 
-// In der Cloud speichern (mit Fallback-Namensabfrage)
+// In Firebase Cloud speichern
 function saveProductToSlot() {
   const selectedSlot = document.getElementById('slot-select').value;
   const count = parseInt(document.getElementById('pill-count').value) || 0;
 
-  // Falls der Name nur aus der EAN besteht, Name abfragen:
-  if (currentScannedName.includes("EAN:")) {
-    const customName = prompt("Produktname in der Datenbank nicht gefunden. Wie heißt das Präparat?", "");
-    if (customName && customName.trim() !== "") {
-      currentScannedName = customName.trim();
-    }
+  if (!currentScannedName || currentScannedName === "-") {
+    alert("Bitte gib zuerst einen Produktnamen ein oder scanne einen Barcode.");
+    return;
   }
 
   slotsData[selectedSlot] = {
@@ -226,17 +251,17 @@ function saveProductToSlot() {
   database.ref(`profiles/${currentProfile}`).set(slotsData)
     .then(() => {
       scanResult.classList.add('hidden');
-      alert(`In der Cloud gespeichert für [${currentProfile}]: ${currentScannedName} in Behälter ${selectedSlot}!`);
+      alert(`Erfolgreich gespeichert für [${currentProfile}]:\n${currentScannedName} in Behälter ${selectedSlot}`);
     })
     .catch(err => alert("Speicherfehler: " + err));
 }
 
-// 5. Entnahme simulieren (Setzt den Namen auf "Leer", sobald count == 0)
+// Entnahme simulieren
 function simulateTakePill(slotId) {
   if (slotsData[slotId] && slotsData[slotId].count > 0) {
     slotsData[slotId].count--;
     
-    // Wenn der Stand auf 0 fällt, wird der Produktname wieder auf "Leer" zurückgesetzt
+    // Sobald count == 0 erreicht ist, schaltet der Name wieder auf "Leer"
     if (slotsData[slotId].count === 0) {
       slotsData[slotId].name = "Leer";
     }
@@ -247,14 +272,13 @@ function simulateTakePill(slotId) {
       setTimeout(() => ledEl.classList.remove('active-green'), 1500);
     }
 
-    // In Firebase aktualisieren
     database.ref(`profiles/${currentProfile}`).set(slotsData);
   } else {
     alert(`Behälter ${slotId} ist bereits leer!`);
   }
 }
 
-// 6. UI aktualisieren
+// UI aktualisieren (Farbanpassung: >0 Stk. -> Grün, 0 Stk. -> Rot)
 function updateUI() {
   for (let i = 1; i <= 4; i++) {
     if (slotsData[i]) {
@@ -264,14 +288,11 @@ function updateUI() {
       const ledEl = document.getElementById(`led-${i}`);
 
       const count = slotsData[i].count || 0;
-      
-      // Falls count == 0 ist, Name als "Leer" anzeigen
       const displayName = (count === 0) ? "Leer" : (slotsData[i].name || "Leer");
 
       if (nameEl) nameEl.innerText = displayName;
       if (countEl) countEl.innerText = count;
 
-      // Farbanpassung: >0 Stk. -> Grün, 0 Stk. -> Rot
       if (cardEl && ledEl) {
         if (count > 0) {
           cardEl.classList.remove('empty-slot');
