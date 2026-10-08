@@ -107,7 +107,7 @@ function listenToCloudData(profileName) {
   });
 }
 
-// Kamera mit hoher Auflösung & Zoom-Unterstützung für kleine Barcodes starten
+// Kamera mit extrem hoher Kompatibilität starten
 function startCamera() {
   readerContainer.classList.remove('hidden');
   scanResult.classList.add('hidden');
@@ -115,42 +115,35 @@ function startCamera() {
 
   html5QrCode = new Html5Qrcode("reader");
   
-  // Konfiguration für hochauflösenden Videostream & flüssige Erkennung
-  const cameraConfig = {
-    facingMode: "environment",
-    width: { min: 1280, ideal: 1920 },  // Full-HD Auflösung anfordern
-    height: { min: 720, ideal: 1080 }
-  };
-
   const scanConfig = {
-    fps: 20,                             // Sehr hohe Erkennungsrate pro Sekunde
+    fps: 20,                             // Hohe Erkennungsrate pro Sekunde
     qrbox: function(viewfinderWidth, viewfinderHeight) {
-      // Dynamisches, breites Kasten-Format speziell für kleine EAN/PZN Barcodes
+      // Breites Scan-Fenster für kleine EAN/PZN Barcodes
       const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
       return {
-        width: Math.floor(viewfinderWidth * 0.85), // 85% der Breite ausnutzen
-        height: Math.floor(minEdge * 0.4)
+        width: Math.floor(viewfinderWidth * 0.85),
+        height: Math.floor(minEdge * 0.5)
       };
     },
     aspectRatio: 1.0
   };
 
+  // Rückkamera starten
   html5QrCode.start(
-    cameraConfig,
+    { facingMode: "environment" },
     scanConfig,
     onBarcodeScanned
   ).then(() => {
-    // Falls das Smartphone optischen/digitalen Zoom unterstützt, aktivieren wir ihn leicht
+    // Falls das Smartphone Zoom unterstützt, leicht heranzoomen (verhindert unscharfe Nahaufnahmen)
     try {
       const track = html5QrCode.getRunningTrack();
       const capabilities = track.getCapabilities();
-      if (capabilities.zoom) {
-        // Zoom leicht erhöhen (z. B. auf 1.5x - 2.0x), damit man nicht zu nah herangehen muss
+      if (capabilities && capabilities.zoom) {
         const targetZoom = Math.min(capabilities.zoom.max, 1.8);
         track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
       }
     } catch (e) {
-      console.log("Kamera-Zoom wird von diesem Gerät/Browser nicht unterstützt:", e);
+      console.log("Zoom nicht unterstützt oder geblockt:", e);
     }
   }).catch(err => {
     alert("Kamera-Fehler: " + err);
