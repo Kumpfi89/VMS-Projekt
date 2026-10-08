@@ -107,7 +107,7 @@ function listenToCloudData(profileName) {
   });
 }
 
-// Kamera mit optimiertem Scan-Bereich für EAN-Barcodes starten
+// Kamera mit hoher Auflösung & Zoom-Unterstützung für kleine Barcodes starten
 function startCamera() {
   readerContainer.classList.remove('hidden');
   scanResult.classList.add('hidden');
@@ -115,17 +115,44 @@ function startCamera() {
 
   html5QrCode = new Html5Qrcode("reader");
   
-  const config = {
-    fps: 15,                             // Höhere Framerate für schnellere Fokussierung
-    qrbox: { width: 300, height: 180 }, // Breiterer Kasten speziell für lange EAN-Barcodes
+  // Konfiguration für hochauflösenden Videostream & flüssige Erkennung
+  const cameraConfig = {
+    facingMode: "environment",
+    width: { min: 1280, ideal: 1920 },  // Full-HD Auflösung anfordern
+    height: { min: 720, ideal: 1080 }
+  };
+
+  const scanConfig = {
+    fps: 20,                             // Sehr hohe Erkennungsrate pro Sekunde
+    qrbox: function(viewfinderWidth, viewfinderHeight) {
+      // Dynamisches, breites Kasten-Format speziell für kleine EAN/PZN Barcodes
+      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+      return {
+        width: Math.floor(viewfinderWidth * 0.85), // 85% der Breite ausnutzen
+        height: Math.floor(minEdge * 0.4)
+      };
+    },
     aspectRatio: 1.0
   };
 
   html5QrCode.start(
-    { facingMode: "environment" },
-    config,
+    cameraConfig,
+    scanConfig,
     onBarcodeScanned
-  ).catch(err => {
+  ).then(() => {
+    // Falls das Smartphone optischen/digitalen Zoom unterstützt, aktivieren wir ihn leicht
+    try {
+      const track = html5QrCode.getRunningTrack();
+      const capabilities = track.getCapabilities();
+      if (capabilities.zoom) {
+        // Zoom leicht erhöhen (z. B. auf 1.5x - 2.0x), damit man nicht zu nah herangehen muss
+        const targetZoom = Math.min(capabilities.zoom.max, 1.8);
+        track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
+      }
+    } catch (e) {
+      console.log("Kamera-Zoom wird von diesem Gerät/Browser nicht unterstützt:", e);
+    }
+  }).catch(err => {
     alert("Kamera-Fehler: " + err);
     stopCamera();
   });
