@@ -1,4 +1,4 @@
-// Eure Firebase-Konfiguration
+// Firebase-Konfiguration
 const firebaseConfig = {
   apiKey: "AIzaSyDnwoB8gFLlEOCuLd5IAe6h3SL3rVUjT-k",
   authDomain: "smartbox-db.firebaseapp.com",
@@ -9,7 +9,7 @@ const firebaseConfig = {
   appId: "1:956387582755:web:5687600ce69a0d0bb9a296"
 };
 
-// Sichere Initialisierung von Firebase
+// Sichere Initialisierung von Firebase (Compat SDK v9)
 let database;
 try {
   if (!firebase.apps.length) {
@@ -25,7 +25,11 @@ let slotsData = {};
 let html5QrCode = null;
 let currentScannedName = "";
 
-// Helper: Verhindert Abstürze durch Tracking Prevention
+// Native Scanner Variablen
+let nativeStream = null;
+let nativeInterval = null;
+
+// Helper: Verhindert Abstürze durch Storage-Restrictions
 function getSafeStorage(key, fallback) {
   try {
     return window.localStorage ? window.localStorage.getItem(key) || fallback : fallback;
@@ -50,9 +54,6 @@ let btnStartScan, btnStopScan, readerContainer, scanResult, productNameEl, btnSa
 let userProfileInput, btnLoadProfile, activeProfileName;
 let btnManualEntry, btnEditName;
 
-// DOM-Elemente für OCR
-let btnOcrScan, ocrFileInput;
-
 document.addEventListener('DOMContentLoaded', () => {
   btnStartScan = document.getElementById('btn-start-scan');
   btnStopScan = document.getElementById('btn-stop-scan');
@@ -67,9 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnManualEntry = document.getElementById('btn-manual-entry');
   btnEditName = document.getElementById('btn-edit-name');
-
-  btnOcrScan = document.getElementById('btn-ocr-scan');
-  ocrFileInput = document.getElementById('ocr-file-input');
 
   currentProfile = getSafeStorage('smartbox_last_profile', 'Sebi');
   if (userProfileInput) userProfileInput.value = currentProfile;
@@ -89,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 1. Direkt-Option: Name manuell ohne Barcode eingeben
+  // 1. Manuelle Eingabe ohne Kamera
   if (btnManualEntry) {
     btnManualEntry.addEventListener('click', () => {
       stopCamera();
@@ -102,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 2. Option: Aktuellen Namen korrigieren/anpassen
+  // 2. Produktnamen anpassen
   if (btnEditName) {
     btnEditName.addEventListener('click', () => {
       const newName = prompt("Produktname anpassen:", currentScannedName);
@@ -112,19 +110,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-
-  // 3. Option: OCR Foto-Scan auslösen
-  if (btnOcrScan && ocrFileInput) {
-    btnOcrScan.addEventListener('click', () => {
-      stopCamera();
-      ocrFileInput.click();
-    });
-
-    ocrFileInput.addEventListener('change', handleOcrImageUpload);
-  }
 });
 
-// Live-Echtzeit-Verbindung zur Firebase Cloud-Datenbank
+// Echtzeit-Verbindung zur Firebase Realtime Database
 function listenToCloudData(profileName) {
   if (activeProfileName) activeProfileName.innerText = profileName;
 
@@ -152,12 +140,124 @@ function listenToCloudData(profileName) {
   });
 }
 
-// Kamera-Logik starten (Barcode) - Optimiert für kleine/gekrümmte Barcodes
+// Kamera-Start (Wählt hardwarebeschleunigte Engine falls verfügbar)
 function startCamera() {
   readerContainer.classList.remove('hidden');
   scanResult.classList.add('hidden');
 
-  // Erkennung auf klassische 1D-Barcodes fokussieren für maximale Performance
+  if ('BarcodeDetector' in window) {
+    startNativeHardwareScanner();
+  } else {
+    startHtml5QrcodeScanner();
+  }
+}
+
+// NATIVE HARDWARE-SCANNER ENGINE MIT BILDVORVERARBEITUNG (Canvas Thresholding)
+async function startNativeHardwareScanner() {
+  let nativeVideo = document.getElementById('native-video');
+  const readerDiv = document.getElementById('reader');
+
+  if (!nativeVideo) {
+    nativeVideo = document.createElement('video');
+    nativeVideo.id = 'native-video';
+    nativeVideo.setAttribute('playsinline', 'true');
+    nativeVideo.style.width = '100%';
+    nativeVideo.style.borderRadius = '8px';
+    nativeVideo.style.background = '#000';
+    readerContainer.insertBefore(nativeVideo, btnStopScan);
+  }
+
+  if (readerDiv) readerDiv.classList.add('hidden');
+  nativeVideo.classList.remove('hidden');
+
+  // Canvas für Echtzeit-Preprocessing erzeugen
+  let processCanvas = document.getElementById('process-canvas');
+  if (!processCanvas) {
+    processCanvas = document.createElement('canvas');
+    processCanvas.id = 'process-canvas';
+    processCanvas.style.display = 'none';
+    document.body.appendChild(processCanvas);
+  }
+  const ctx = processCanvas.getContext('2d', { willReadFrequently: true });
+
+  try {
+    const barcodeDetector = new BarcodeDetector({
+      formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e']
+    });
+
+    nativeStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "environment",
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    });
+
+    nativeVideo.srcObject = nativeStream;
+    await nativeVideo.play();
+
+    // Optischen Zoom sicher anfordern
+    try {
+      const track = nativeStream.getVideoTracks()[0];
+      if (track && track.getCapabilities) {
+        const capabilities = track.getCapabilities();
+        if (capabilities && capabilities.zoom) {
+          const targetZoom = Math.min(capabilities.zoom.max, 2.0);
+          await track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
+        }
+      }
+    } catch (e) {
+      console.log("Native Zoom nicht angewendet:", e);
+    }
+
+    // Schleife zur Barcode-Erkennung auf dem optimierten Frame
+    nativeInterval = setInterval(async () => {
+      try {
+        if (nativeVideo.videoWidth === 0) return;
+
+        processCanvas.width = nativeVideo.videoWidth;
+        processCanvas.height = nativeVideo.videoHeight;
+
+        // 1. Frame auf Canvas zeichnen
+        ctx.drawImage(nativeVideo, 0, 0, processCanvas.width, processCanvas.height);
+
+        // 2. Binarisierung (Glanzflecken & farbige Hintergründe ausblenden)
+        const imgData = ctx.getImageData(0, 0, processCanvas.width, processCanvas.height);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+          const threshold = avg < 120 ? 0 : 255;
+          data[i] = threshold;     // R
+          data[i + 1] = threshold; // G
+          data[i + 2] = threshold; // B
+        }
+        ctx.putImageData(imgData, 0, 0);
+
+        // 3. Auf bereinigtem Canvas suchen
+        const barcodes = await barcodeDetector.detect(processCanvas);
+        if (barcodes.length > 0) {
+          stopCamera();
+          onBarcodeScanned(barcodes[0].rawValue);
+        }
+      } catch (e) {
+        console.error("Native Scan Fehler:", e);
+      }
+    }, 150);
+
+  } catch (err) {
+    console.warn("Native Scanner fehlgeschlagen, schalte auf HTML5 Fallback um:", err);
+    startHtml5QrcodeScanner();
+  }
+}
+
+// Fallback: html5-qrcode
+function startHtml5QrcodeScanner() {
+  const nativeVideo = document.getElementById('native-video');
+  const readerDiv = document.getElementById('reader');
+
+  if (nativeVideo) nativeVideo.classList.add('hidden');
+  if (readerDiv) readerDiv.classList.remove('hidden');
+
   const formatsToSupport = [
     Html5QrcodeSupportedFormats.EAN_13,
     Html5QrcodeSupportedFormats.EAN_8,
@@ -167,55 +267,65 @@ function startCamera() {
   ];
 
   html5QrCode = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport });
-  
-  // Hohe Kameraauflösung anfordern (Full-HD)
-  const videoConstraints = {
-    facingMode: "environment",
-    width: { ideal: 1920 },
-    height: { ideal: 1080 }
-  };
 
   const scanConfig = {
-    fps: 30, // 30 FPS für schnellere Scharfstellung
+    fps: 30,
     qrbox: function(viewfinderWidth, viewfinderHeight) {
       const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
       return {
         width: Math.floor(viewfinderWidth * 0.9),
-        height: Math.floor(minEdge * 0.35) // Schmaler Streifen ist ideal für 1D-Strichcodes
+        height: Math.floor(minEdge * 0.35)
       };
     },
-    aspectRatio: 1.0
+    aspectRatio: 1.0,
+    videoConstraints: {
+      facingMode: "environment"
+    }
   };
 
   html5QrCode.start(
-    videoConstraints,
+    { facingMode: "environment" },
     scanConfig,
     onBarcodeScanned
-  ).then(() => {
-    try {
-      const track = html5QrCode.getRunningTrack();
-      const capabilities = track.getCapabilities();
-      if (capabilities && capabilities.zoom) {
-        // Zoom leicht anheben (2.0x), damit man Abstand halten kann (flacht Rundungen optisch ab)
-        const targetZoom = Math.min(capabilities.zoom.max, 2.0);
-        track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
-      }
-    } catch (e) {
-      console.log("Zoom nicht unterstützt:", e);
-    }
-  }).catch(err => {
+  ).catch(err => {
     alert("Kamera-Fehler: " + err);
     stopCamera();
   });
 }
 
-// Barcode erkannt -> Produktsuche mit Fallback
+// Kamera stoppen
+function stopCamera() {
+  if (nativeInterval) {
+    clearInterval(nativeInterval);
+    nativeInterval = null;
+  }
+  if (nativeStream) {
+    nativeStream.getTracks().forEach(track => track.stop());
+    nativeStream = null;
+  }
+
+  const nativeVideo = document.getElementById('native-video');
+  if (nativeVideo) nativeVideo.classList.add('hidden');
+
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => {
+      readerContainer.classList.add('hidden');
+    }).catch(() => {
+      readerContainer.classList.add('hidden');
+    });
+  } else {
+    readerContainer.classList.add('hidden');
+  }
+}
+
+// Barcode erkannt -> Prüft Open Food Facts & danach die eigene Firebase-Datenbank
 function onBarcodeScanned(decodedText) {
   stopCamera();
   
   productNameEl.innerText = "Lade Produktdaten...";
   scanResult.classList.remove('hidden');
 
+  // 1. Zuerst in Open Food Facts suchen
   fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`)
     .then(res => res.json())
     .then(data => {
@@ -235,88 +345,70 @@ function onBarcodeScanned(decodedText) {
         }
       }
 
-      // Falls Barcode nicht in Open Food Facts gefunden wurde
-      if (!detectedName) {
-        detectedName = `Präparat (EAN: ${decodedText})`;
-        setTimeout(() => {
-          const manualFix = prompt(`Barcode ${decodedText} nicht in der Datenbank gefunden. Wie heißt das Produkt?`, "");
-          if (manualFix && manualFix.trim() !== "") {
-            currentScannedName = manualFix.trim();
-            productNameEl.innerText = currentScannedName;
-          }
-        }, 300);
+      // Wenn in Open Food Facts gefunden, direkt nutzen
+      if (detectedName) {
+        currentScannedName = detectedName;
+        productNameEl.innerText = currentScannedName;
+      } else {
+        // 2. Falls nicht bei Open Food Facts -> Eigene Firebase-Datenbank prüfen
+        checkCustomDatabase(decodedText);
       }
-
-      currentScannedName = detectedName;
-      productNameEl.innerText = currentScannedName;
     })
     .catch(() => {
-      currentScannedName = `Präparat (EAN: ${decodedText})`;
-      productNameEl.innerText = currentScannedName;
+      checkCustomDatabase(decodedText);
     });
 }
 
-// OCR-Foto aufnehmen und an den Node.js Backend-Server senden
-function handleOcrImageUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  productNameEl.innerText = "Lese Zahl vom Foto (OCR)...";
-  scanResult.classList.remove('hidden');
-
-  const reader = new FileReader();
-  
-  reader.onload = async function(e) {
-    const base64Image = e.target.result;
-    const selectedSlot = document.getElementById('slot-select')?.value || "1";
-    const activeProfile = (typeof currentProfile !== 'undefined' && currentProfile) ? currentProfile : "Sebi";
-
-    try {
-      const response = await fetch('https://integrity-museums-prohibited-bigger.trycloudflare.com/api/ocr-scan', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          image: base64Image,
-          profile: activeProfile,
-          slot: selectedSlot
-        })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        currentScannedName = result.detectedCode;
-        productNameEl.innerText = currentScannedName;
-        alert(`OCR Erfolgreich! Erkannter Code '${result.detectedCode}' wurde in Firebase gespeichert.`);
-      } else {
-        alert("OCR Fehler: " + (result.message || result.error));
-        productNameEl.innerText = "Zahl nicht erkannt";
-      }
-    } catch (error) {
-      console.error("OCR Request Fehler:", error);
-      alert("Fehler: Verbindung zum OCR-Server fehlgeschlagen.");
-      productNameEl.innerText = "Verbindungsfehler";
-    } finally {
-      if (ocrFileInput) ocrFileInput.value = "";
-    }
-  };
-
-  reader.readAsDataURL(file);
-}
-
-function stopCamera() {
-  if (html5QrCode) {
-    html5QrCode.stop().then(() => {
-      readerContainer.classList.add('hidden');
-    }).catch(() => {});
-  } else {
-    readerContainer.classList.add('hidden');
+// Hilfsfunktion: Prüft/Speichert selbsterstellte Barcodes in Firebase Realtime Database
+function checkCustomDatabase(barcode) {
+  if (!database) {
+    handleUnknownBarcode(barcode);
+    return;
   }
+
+  // Pfad in Firebase: /custom_barcodes/EAN_NUMMER
+  database.ref(`custom_barcodes/${barcode}`).once('value')
+    .then((snapshot) => {
+      const savedName = snapshot.val();
+
+      if (savedName) {
+        // Barcode wurde schon einmal gespeichert!
+        currentScannedName = savedName;
+        productNameEl.innerText = currentScannedName;
+      } else {
+        // Unbekannter Barcode -> Abfragen und in Firebase speichern
+        handleUnknownBarcode(barcode);
+      }
+    })
+    .catch(() => {
+      handleUnknownBarcode(barcode);
+    });
 }
 
-// In Firebase Cloud speichern
+// Fragt den Nutzer nach dem Namen und speichert den Barcode dauerhaft in Firebase
+function handleUnknownBarcode(barcode) {
+  currentScannedName = `Präparat (EAN: ${barcode})`;
+  productNameEl.innerText = currentScannedName;
+
+  setTimeout(() => {
+    const manualFix = prompt(`Barcode ${barcode} ist unbekannt. Wie heißt das Produkt?`, "");
+    if (manualFix && manualFix.trim() !== "") {
+      currentScannedName = manualFix.trim();
+      productNameEl.innerText = currentScannedName;
+
+      // In Firebase unter custom_barcodes ablegen
+      if (database) {
+        database.ref(`custom_barcodes/${barcode}`).set(currentScannedName)
+          .then(() => {
+            console.log(`Barcode ${barcode} wurde dauerhaft als "${currentScannedName}" in Firebase gespeichert.`);
+          })
+          .catch(err => console.error("Fehler beim Speichern des Barcodes:", err));
+      }
+    }
+  }, 300);
+}
+
+// Speichern in Firebase Realtime Database
 function saveProductToSlot() {
   const selectedSlot = document.getElementById('slot-select').value;
   const count = parseInt(document.getElementById('pill-count').value) || 0;
@@ -360,7 +452,7 @@ function simulateTakePill(slotId) {
   }
 }
 
-// UI aktualisieren (Farbanpassung: >0 Stk. -> Grün, 0 Stk. -> Rot)
+// UI-Anzeige synchronisieren
 function updateUI() {
   for (let i = 1; i <= 4; i++) {
     if (slotsData[i]) {
