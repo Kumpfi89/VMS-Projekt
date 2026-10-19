@@ -50,6 +50,9 @@ let btnStartScan, btnStopScan, readerContainer, scanResult, productNameEl, btnSa
 let userProfileInput, btnLoadProfile, activeProfileName;
 let btnManualEntry, btnEditName;
 
+// Neue DOM-Elemente für OCR
+let btnOcrScan, ocrFileInput;
+
 document.addEventListener('DOMContentLoaded', () => {
   btnStartScan = document.getElementById('btn-start-scan');
   btnStopScan = document.getElementById('btn-stop-scan');
@@ -64,6 +67,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnManualEntry = document.getElementById('btn-manual-entry');
   btnEditName = document.getElementById('btn-edit-name');
+
+  // OCR Elemente zuweisen
+  btnOcrScan = document.getElementById('btn-ocr-scan');
+  ocrFileInput = document.getElementById('ocr-file-input');
 
   currentProfile = getSafeStorage('smartbox_last_profile', 'Sebi');
   if (userProfileInput) userProfileInput.value = currentProfile;
@@ -106,6 +113,16 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // 3. Option: OCR Foto-Scan auslösen
+  if (btnOcrScan && ocrFileInput) {
+    btnOcrScan.addEventListener('click', () => {
+      stopCamera();
+      ocrFileInput.click();
+    });
+
+    ocrFileInput.addEventListener('change', handleOcrImageUpload);
+  }
 });
 
 // Live-Echtzeit-Verbindung zur Firebase Cloud-Datenbank
@@ -136,7 +153,7 @@ function listenToCloudData(profileName) {
   });
 }
 
-// Kamera-Logik starten
+// Kamera-Logik starten (Barcode)
 function startCamera() {
   readerContainer.classList.remove('hidden');
   scanResult.classList.add('hidden');
@@ -194,7 +211,7 @@ function onBarcodeScanned(decodedText) {
         const brand = p.brands ? p.brands.split(',')[0].trim() : "";
 
         if (baseName && brand) {
-          detectedName = `${brand} - ${baseName}`;
+          detectedName = `${brand} ${baseName}`;
         } else if (baseName) {
           detectedName = baseName;
         } else if (brand) {
@@ -221,6 +238,50 @@ function onBarcodeScanned(decodedText) {
       currentScannedName = `Präparat (EAN: ${decodedText})`;
       productNameEl.innerText = currentScannedName;
     });
+}
+
+// OCR-Foto aufnehmen und an den Node.js Backend-Server senden
+function handleOcrImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  productNameEl.innerText = "Lese Zahl vom Foto (OCR)...";
+  scanResult.classList.remove('hidden');
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    const base64Image = e.target.result;
+    const selectedSlot = document.getElementById('slot-select')?.value || "1";
+
+    try {
+      const response = await fetch('http://localhost:3000/api/ocr-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: base64Image,
+          profile: currentProfile,
+          slot: selectedSlot
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        currentScannedName = `Code: ${result.detectedCode}`;
+        productNameEl.innerText = currentScannedName;
+        alert(`OCR Erfolgreich! Erkannter Code '${result.detectedCode}' wurde in Firebase gespeichert.`);
+      } else {
+        alert("OCR Fehler: " + (result.message || result.error));
+        productNameEl.innerText = "Zahl nicht erkannt";
+      }
+    } catch (error) {
+      console.error("OCR Request Fehler:", error);
+      alert("Fehler: Verbindung zum OCR-Server auf Port 3000 fehlgeschlagen. Läuft der Server?");
+      productNameEl.innerText = "Verbindungsfehler";
+    }
+  };
+
+  reader.readAsDataURL(file);
 }
 
 function stopCamera() {

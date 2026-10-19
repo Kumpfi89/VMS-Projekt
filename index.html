@@ -33,16 +33,20 @@
       <p class="active-profile-info">Aktuelles Profil: <strong id="active-profile-name">Sebi</strong></p>
     </section>
     
-    <!-- Bereich 1: Barcode Scanner & Befüll-Assistent -->
+    <!-- Bereich 1: Barcode / OCR Scanner & Befüll-Assistent -->
     <section class="card scanner-card">
       <h2>Neues Supplement hinzufügen</h2>
       
       <!-- Wahlmöglichkeiten für den Nutzer -->
       <div class="action-buttons" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
         <button id="btn-start-scan" class="btn btn-primary" style="flex: 1; min-width: 140px;">📷 Barcode scannen</button>
+        <button id="btn-ocr-scan" class="btn btn-primary" style="flex: 1; min-width: 140px; background-color: #8e44ad;">🖼️ Foto / OCR Zahl</button>
         <button id="btn-manual-entry" class="btn btn-primary" style="flex: 1; min-width: 140px; background-color: #3498db;">✏️ Name manuell eingeben</button>
       </div>
       
+      <!-- Verstecktes Input-Element für die OCR-Kameraaufnahme -->
+      <input type="file" id="ocr-file-input" accept="image/*" capture="environment" style="display: none;">
+
       <!-- Video-Fenster für die Smartphone-Kamera -->
       <div id="reader-container" class="hidden">
         <div id="reader"></div>
