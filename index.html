@@ -3,62 +3,62 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smartbox Management</title>
+  <title>Smart Supplement Box Dashboard</title>
   <link rel="stylesheet" href="style.css">
   
-  <!-- Firebase Scripts -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <!-- Firebase SDKs (v9 Compat - MÜSSEN ganz oben stehen!) -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
-  <!-- HTML5 QR Code Library -->
-  <script src="https://unpkg.com/html5-qrcode"></script>
-
-  <!-- App Script -->
-  <script src="app.js" defer></script>
+  <!-- HTML5-QRCode Bibliothek für den Barcode/QR-Scan -->
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 <body>
-  <div class="container">
-    <h1>💊 Smartbox Dashboard</h1>
 
-    <!-- Profilauswahl -->
-    <div class="card profile-section">
-      <h3>Profil verwalten</h3>
-      <div class="input-group">
-        <input type="text" id="user-profile-input" placeholder="Profilname (z. B. Sebi)">
-        <button id="btn-load-profile">Profil laden</button>
+  <header>
+    <h1>Smarte Supplementbox</h1>
+    <p>OTH Regensburg - Vertiefung Mess- & Sensortechnik</p>
+    <p>Sarah Aljleilati, Ben Burger, Dominik Herzog, Sebastian Kumpfmüller</p>
+  </header>
+
+  <main class="container">
+
+    <!-- Profil- & Name-Auswahl -->
+    <section class="card profile-card">
+      <h2>Profil auswählen</h2>
+      <div class="profile-input-group">
+        <input type="text" id="user-profile-input" placeholder="Name oder Box-ID eingeben (z. B. Sebi)" value="Sebi">
+        <button id="btn-load-profile" class="btn btn-primary btn-inline">Laden</button>
       </div>
-      <p>Aktives Profil: <strong id="active-profile-name">Sebi</strong></p>
-    </div>
-
-    <!-- Scanner & Eingabe Aktionen -->
-    <div class="card scan-section">
-      <h3>Präparat hinzufügen</h3>
+      <p class="active-profile-info">Aktuelles Profil: <strong id="active-profile-name">Sebi</strong></p>
+    </section>
+    
+    <!-- Bereich 1: Barcode Scanner & Befüll-Assistent -->
+    <section class="card scanner-card">
+      <h2>Neues Supplement hinzufügen</h2>
       
-      <div class="button-group">
-        <button id="btn-start-scan">📷 Barcode Scannen</button>
-        <button id="btn-ocr-scan">🖼️ Foto / OCR Zahl</button>
-        <button id="btn-manual-entry">✏️ Manuell Eingeben</button>
+      <!-- Wahlmöglichkeiten für den Nutzer -->
+      <div class="action-buttons" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+        <button id="btn-start-scan" class="btn btn-primary" style="flex: 1; min-width: 140px;">📷 Barcode scannen</button>
+        <button id="btn-manual-entry" class="btn btn-primary" style="flex: 1; min-width: 140px; background-color: #3498db;">✏️ Name manuell eingeben</button>
       </div>
-
-      <!-- Versteckter File-Input für das OCR-Foto -->
-      <input type="file" id="ocr-file-input" accept="image/*" class="hidden">
-
-      <!-- Reader Container für Kamera Feed -->
+      
+      <!-- Video-Fenster für die Smartphone-Kamera -->
       <div id="reader-container" class="hidden">
         <div id="reader"></div>
-        <!-- Element für den nativen Video-Stream -->
-        <video id="native-video" playsinline class="hidden" style="width: 100%; border-radius: 8px; background: #000;"></video>
-        <button id="btn-stop-scan" class="btn-danger">Kamera Schließen</button>
+        <button id="btn-stop-scan" class="btn btn-danger">Abbrechen</button>
       </div>
 
-      <!-- Scan Erfassungs-Ergebnis -->
+      <!-- Anzeigebereich für gescanntes / manuell eingegebenes Produkt -->
       <div id="scan-result" class="hidden">
-        <h4>Erkanntes Produkt:</h4>
-        <p id="product-name">-</p>
-        <button id="btn-edit-name" class="btn-small">✏️ Name anpassen</button>
-
-        <div class="slot-selection">
-          <label for="slot-select">Behälter auswählen:</label>
+        <p class="scan-label">Ausgewähltes Produkt:</p>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem;">
+          <p id="product-name" class="product-title" style="margin: 0; font-weight: bold; font-size: 1.2rem;">-</p>
+          <button id="btn-edit-name" class="btn btn-small" style="width: auto; padding: 0.4rem 0.8rem;" title="Name anpassen">✏️ Ändern</button>
+        </div>
+        
+        <div class="assign-group">
+          <label for="slot-select">Behälter zuweisen:</label>
           <select id="slot-select">
             <option value="1">Behälter 1</option>
             <option value="2">Behälter 2</option>
@@ -67,74 +67,82 @@
           </select>
         </div>
 
-        <div class="count-selection">
-          <label for="pill-count">Anzahl (Stück):</label>
-          <input type="number" id="pill-count" value="10" min="1">
+        <div class="assign-group">
+          <label for="pill-count">Anzahl Tabletten:</label>
+          <input type="number" id="pill-count" value="30" min="1">
         </div>
 
-        <button id="btn-save-slot" class="btn-success">In Smartbox Speichern</button>
+        <button id="btn-save-slot" class="btn btn-success" style="margin-top: 1rem;">Behälter befüllen & speichern</button>
       </div>
-    </div>
+    </section>
 
-    <!-- Übersicht der 4 Slots -->
-    <div class="card slots-overview">
-      <h3>Behälter Übersicht</h3>
-      <div class="slots-grid">
+    <!-- Bereich 2: Das 4-Kacheln Dashboard der Box -->
+    <section class="dashboard">
+      <h2>Übersicht der Behälter</h2>
+      <div class="grid">
         
-        <!-- Slot 1 -->
-        <div class="slot-card empty-slot" id="slot-card-1">
+        <!-- Behälter 1 -->
+        <div class="slot-card" id="slot-card-1">
           <div class="slot-header">
-            <span>Behälter 1</span>
-            <span class="led red" id="led-1"></span>
+            <h3>Behälter 1</h3>
+            <span class="status-led" id="led-1"></span>
           </div>
-          <div class="slot-body">
-            <h4 id="name-1">Leer</h4>
-            <p><span id="count-1">0</span> Stk.</p>
+          <p class="med-name" id="name-1">Lade Cloud-Daten...</p>
+          <div class="count-display">
+            <span class="count-number" id="count-1">0</span>
+            <span class="count-unit">Stk.</span>
           </div>
-          <button onclick="simulateTakePill(1)" class="btn-small">Entnahme (-1)</button>
+          <button class="btn btn-small" onclick="simulateTakePill(1)">Eingenommen</button>
         </div>
 
-        <!-- Slot 2 -->
-        <div class="slot-card empty-slot" id="slot-card-2">
+        <!-- Behälter 2 -->
+        <div class="slot-card" id="slot-card-2">
           <div class="slot-header">
-            <span>Behälter 2</span>
-            <span class="led red" id="led-2"></span>
+            <h3>Behälter 2</h3>
+            <span class="status-led" id="led-2"></span>
           </div>
-          <div class="slot-body">
-            <h4 id="name-2">Leer</h4>
-            <p><span id="count-2">0</span> Stk.</p>
+          <p class="med-name" id="name-2">Lade Cloud-Daten...</p>
+          <div class="count-display">
+            <span class="count-number" id="count-2">0</span>
+            <span class="count-unit">Stk.</span>
           </div>
-          <button onclick="simulateTakePill(2)" class="btn-small">Entnahme (-1)</button>
+          <button class="btn btn-small" onclick="simulateTakePill(2)">Eingenommen</button>
         </div>
 
-        <!-- Slot 3 -->
-        <div class="slot-card empty-slot" id="slot-card-3">
+        <!-- Behälter 3 -->
+        <div class="slot-card" id="slot-card-3">
           <div class="slot-header">
-            <span>Behälter 3</span>
-            <span class="led red" id="led-3"></span>
+            <h3>Behälter 3</h3>
+            <span class="status-led" id="led-3"></span>
           </div>
-          <div class="slot-body">
-            <h4 id="name-3">Leer</h4>
-            <p><span id="count-3">0</span> Stk.</p>
+          <p class="med-name" id="name-3">Lade Cloud-Daten...</p>
+          <div class="count-display">
+            <span class="count-number" id="count-3">0</span>
+            <span class="count-unit">Stk.</span>
           </div>
-          <button onclick="simulateTakePill(3)" class="btn-small">Entnahme (-1)</button>
+          <button class="btn btn-small" onclick="simulateTakePill(3)">Eingenommen</button>
         </div>
 
-        <!-- Slot 4 -->
-        <div class="slot-card empty-slot" id="slot-card-4">
+        <!-- Behälter 4 -->
+        <div class="slot-card" id="slot-card-4">
           <div class="slot-header">
-            <span>Behälter 4</span>
-            <span class="led red" id="led-4"></span>
+            <h3>Behälter 4</h3>
+            <span class="status-led" id="led-4"></span>
           </div>
-          <div class="slot-body">
-            <h4 id="name-4">Leer</h4>
-            <p><span id="count-4">0</span> Stk.</p>
+          <p class="med-name" id="name-4">Lade Cloud-Daten...</p>
+          <div class="count-display">
+            <span class="count-number" id="count-4">0</span>
+            <span class="count-unit">Stk.</span>
           </div>
-          <button onclick="simulateTakePill(4)" class="btn-small">Entnahme (-1)</button>
+          <button class="btn btn-small" onclick="simulateTakePill(4)">Eingenommen</button>
         </div>
 
       </div>
-    </div>
-  </div>
+    </section>
+
+  </main>
+
+  <!-- Hauptlogik -->
+  <script src="app.js"></script>
 </body>
 </html>
