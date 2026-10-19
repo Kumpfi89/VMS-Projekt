@@ -49,6 +49,17 @@ function setSafeStorage(key, value) {
   }
 }
 
+// Mathe-Check: Mathematische Validierung von EAN-13 Prüfsummen (Modulo 10)
+function isValidEAN13(ean) {
+  if (!/^\d{13}$/.exec(ean)) return false;
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(ean.charAt(i), 10) * (i % 2 === 0 ? 1 : 3);
+  }
+  const checkDigit = (10 - (sum % 10)) % 10;
+  return checkDigit === parseInt(ean.charAt(12), 10);
+}
+
 // DOM-Elemente
 let btnStartScan, btnStopScan, readerContainer, scanResult, productNameEl, btnSaveSlot;
 let userProfileInput, btnLoadProfile, activeProfileName;
@@ -140,7 +151,7 @@ function listenToCloudData(profileName) {
   });
 }
 
-// Kamera-Start (Wählt hardwarebeschleunigte Engine falls verfügbar)
+// Kamera-Start
 function startCamera() {
   readerContainer.classList.remove('hidden');
   scanResult.classList.add('hidden');
@@ -152,7 +163,7 @@ function startCamera() {
   }
 }
 
-// SCHLANKE NATIVE HARDWARE-ENGINE (Direkt auf dem Videostream für maximale FPS)
+// NATIVE HARDWARE-ENGINE (Strikte Formate zur Vermeidung von Fehllesungen)
 async function startNativeHardwareScanner() {
   let nativeVideo = document.getElementById('native-video');
   const readerDiv = document.getElementById('reader');
@@ -171,8 +182,9 @@ async function startNativeHardwareScanner() {
   nativeVideo.classList.remove('hidden');
 
   try {
+    // Nur noch echte Supermarkt-/Medikamenten-Formate zulassen!
     const barcodeDetector = new BarcodeDetector({
-      formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e', 'code_39', 'codabar']
+      formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e']
     });
 
     nativeStream = await navigator.mediaDevices.getUserMedia({
@@ -186,7 +198,7 @@ async function startNativeHardwareScanner() {
     nativeVideo.srcObject = nativeStream;
     await nativeVideo.play();
 
-    // Optischen Zoom aktivieren (falls vorhanden)
+    // Optischen Zoom aktivieren
     try {
       const track = nativeStream.getVideoTracks()[0];
       if (track && track.getCapabilities) {
@@ -200,15 +212,22 @@ async function startNativeHardwareScanner() {
       console.log("Zoom nicht angewendet:", e);
     }
 
-    // Schnelle Scan-Schleife ohne störende Filter direkt auf dem Rohbild
     nativeInterval = setInterval(async () => {
       try {
         if (nativeVideo.readyState < 2) return;
 
         const barcodes = await barcodeDetector.detect(nativeVideo);
         if (barcodes.length > 0) {
+          const code = barcodes[0].rawValue;
+
+          // Falls es ein 13-stelliger EAN ist, Prüfsumme verifizieren
+          if (code.length === 13 && !isValidEAN13(code)) {
+            console.warn("Fehlerhafter EAN-13 Scan ignoriert:", code);
+            return;
+          }
+
           stopCamera();
-          onBarcodeScanned(barcodes[0].rawValue);
+          onBarcodeScanned(code);
         }
       } catch (e) {
         console.error("Native Scan Fehler:", e);
@@ -232,7 +251,6 @@ function startHtml5QrcodeScanner() {
   const formatsToSupport = [
     Html5QrcodeSupportedFormats.EAN_13,
     Html5QrcodeSupportedFormats.EAN_8,
-    Html5QrcodeSupportedFormats.CODE_128,
     Html5QrcodeSupportedFormats.UPC_A,
     Html5QrcodeSupportedFormats.UPC_E
   ];
@@ -316,7 +334,6 @@ function onBarcodeScanned(decodedText) {
         }
       }
 
-      // Wenn in Open Food Facts gefunden, direkt nutzen
       if (detectedName) {
         currentScannedName = detectedName;
         productNameEl.innerText = currentScannedName;
@@ -337,17 +354,14 @@ function checkCustomDatabase(barcode) {
     return;
   }
 
-  // Pfad in Firebase: /custom_barcodes/EAN_NUMMER
   database.ref(`custom_barcodes/${barcode}`).once('value')
     .then((snapshot) => {
       const savedName = snapshot.val();
 
       if (savedName) {
-        // Barcode wurde schon einmal gespeichert!
         currentScannedName = savedName;
         productNameEl.innerText = currentScannedName;
       } else {
-        // Unbekannter Barcode -> Abfragen und in Firebase speichern
         handleUnknownBarcode(barcode);
       }
     })
@@ -367,7 +381,6 @@ function handleUnknownBarcode(barcode) {
       currentScannedName = manualFix.trim();
       productNameEl.innerText = currentScannedName;
 
-      // In Firebase unter custom_barcodes ablegen
       if (database) {
         database.ref(`custom_barcodes/${barcode}`).set(currentScannedName)
           .then(() => {
