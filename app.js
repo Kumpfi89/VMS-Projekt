@@ -249,14 +249,18 @@ function handleOcrImageUpload(event) {
   scanResult.classList.remove('hidden');
 
   const reader = new FileReader();
+  
   reader.onload = async function(e) {
     const base64Image = e.target.result;
     const selectedSlot = document.getElementById('slot-select')?.value || "1";
 
     try {
-      const response = await fetch('http://172.20.10.2:3000/api/ocr-scan', {
+      const response = await fetch('https://warm-toys-eat.loca.lt/api/ocr-scan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Bypass-Tunnel-Reminder': 'true' // Verhindert die Localtunnel-Warnseite
+        },
         body: JSON.stringify({
           image: base64Image,
           profile: currentProfile,
@@ -276,10 +280,10 @@ function handleOcrImageUpload(event) {
       }
     } catch (error) {
       console.error("OCR Request Fehler:", error);
-      alert("Fehler: Verbindung zum OCR-Server auf Port 3000 fehlgeschlagen. Läuft der Server?");
+      alert("Fehler: Verbindung zum OCR-Server fehlgeschlagen.");
       productNameEl.innerText = "Verbindungsfehler";
     }
-  };
+  }; // <-- onload Endklammer gefixt
 
   reader.readAsDataURL(file);
 }
