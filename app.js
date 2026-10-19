@@ -257,9 +257,9 @@ function handleOcrImageUpload(event) {
     const selectedSlot = document.getElementById('slot-select')?.value || "1";
     const activeProfile = (typeof currentProfile !== 'undefined' && currentProfile) ? currentProfile : "Sebi";
 
-    try {
-      // Reiner Standard-POST-Request ohne Custom-Header
-      const response = await fetch('https://smartbox-ocr-sebi.loca.lt/api/ocr-scan', {
+   try {
+      // Cloudflare URL inklusive Endpunkt /api/ocr-scan
+      const response = await fetch('https://integrity-museums-prohibited-bigger.trycloudflare.com/api/ocr-scan', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json'
