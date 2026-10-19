@@ -152,7 +152,7 @@ function listenToCloudData(profileName) {
   });
 }
 
-// Kamera-Logik starten (Barcode) - Optimiert für kleine/gekrümmte Barcodes
+// Kamera-Logik starten (Barcode) - Mit nativer Hardware-Scanner-Engine
 function startCamera() {
   readerContainer.classList.remove('hidden');
   scanResult.classList.add('hidden');
@@ -166,7 +166,13 @@ function startCamera() {
     Html5QrcodeSupportedFormats.UPC_E
   ];
 
-  html5QrCode = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport });
+  // Instanzieren mit nativer Smartphone-BarcodeDetector-API als Zusatz
+  html5QrCode = new Html5Qrcode("reader", { 
+    formatsToSupport: formatsToSupport,
+    experimentalFeatures: {
+      useBarCodeDetectorIfSupported: true // Aktiviert native Handy-Scanner-Hardware
+    }
+  });
 
   // Konfiguration für Auflösung, FPS und das Scan-Sichtfeld
   const scanConfig = {
@@ -186,7 +192,7 @@ function startCamera() {
     }
   };
 
-  // Erster Parameter hat exakt 1 Key ({ facingMode: "environment" })
+  // Starten mit exakt 1 Key
   html5QrCode.start(
     { facingMode: "environment" },
     scanConfig,
