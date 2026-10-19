@@ -25,6 +25,10 @@ let slotsData = {};
 let html5QrCode = null;
 let currentScannedName = "";
 
+// Native Scanner Variablen
+let nativeStream = null;
+let nativeInterval = null;
+
 // Helper: Verhindert Abstürze durch Tracking Prevention
 function getSafeStorage(key, fallback) {
   try {
@@ -152,12 +156,82 @@ function listenToCloudData(profileName) {
   });
 }
 
-// Kamera-Logik starten (Barcode) - Mit nativer Hardware-Scanner-Engine
+// Hauptfunktion zum Starten der Kamera (Nutzt nativen Hardware-Detector falls vorhanden)
 function startCamera() {
   readerContainer.classList.remove('hidden');
   scanResult.classList.add('hidden');
 
-  // Erkennung auf klassische 1D-Barcodes fokussieren
+  // Prüfen, ob das Smartphone die native Barcode-Detector-API besitzt
+  if ('BarcodeDetector' in window) {
+    startNativeHardwareScanner();
+  } else {
+    startHtml5QrcodeScanner();
+  }
+}
+
+// NATIVE HARDWARE-SCANNER ENGINE (Maximale Trefferquote bei Glanz & Rundung)
+async function startNativeHardwareScanner() {
+  const nativeVideo = document.getElementById('native-video');
+  const readerDiv = document.getElementById('reader');
+
+  readerDiv.classList.add('hidden');
+  nativeVideo.classList.remove('hidden');
+
+  try {
+    const barcodeDetector = new BarcodeDetector({
+      formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e']
+    });
+
+    nativeStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "environment",
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    });
+
+    nativeVideo.srcObject = nativeStream;
+    await nativeVideo.play();
+
+    // Zoom versuchsweise aktivieren
+    try {
+      const track = nativeStream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities();
+      if (capabilities && capabilities.zoom) {
+        const targetZoom = Math.min(capabilities.zoom.max, 2.0);
+        track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
+      }
+    } catch (e) {
+      console.log("Native Zoom nicht unterstützt:", e);
+    }
+
+    // Schleife zur Barcode-Erkennung
+    nativeInterval = setInterval(async () => {
+      try {
+        const barcodes = await barcodeDetector.detect(nativeVideo);
+        if (barcodes.length > 0) {
+          stopCamera();
+          onBarcodeScanned(barcodes[0].rawValue);
+        }
+      } catch (e) {
+        console.error("Native Scan Fehler:", e);
+      }
+    }, 150);
+
+  } catch (err) {
+    console.warn("Native Scanner fehlgeschlagen, schalte auf HTML5 Fallback um:", err);
+    startHtml5QrcodeScanner();
+  }
+}
+
+// FALLBACK: Standard html5-qrcode Scanner
+function startHtml5QrcodeScanner() {
+  const nativeVideo = document.getElementById('native-video');
+  const readerDiv = document.getElementById('reader');
+
+  nativeVideo.classList.add('hidden');
+  readerDiv.classList.remove('hidden');
+
   const formatsToSupport = [
     Html5QrcodeSupportedFormats.EAN_13,
     Html5QrcodeSupportedFormats.EAN_8,
@@ -166,15 +240,8 @@ function startCamera() {
     Html5QrcodeSupportedFormats.UPC_E
   ];
 
-  // Instanzieren mit nativer Smartphone-BarcodeDetector-API als Zusatz
-  html5QrCode = new Html5Qrcode("reader", { 
-    formatsToSupport: formatsToSupport,
-    experimentalFeatures: {
-      useBarCodeDetectorIfSupported: true // Aktiviert native Handy-Scanner-Hardware
-    }
-  });
+  html5QrCode = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport });
 
-  // Konfiguration für Auflösung, FPS und das Scan-Sichtfeld
   const scanConfig = {
     fps: 30,
     qrbox: function(viewfinderWidth, viewfinderHeight) {
@@ -192,7 +259,6 @@ function startCamera() {
     }
   };
 
-  // Starten mit exakt 1 Key
   html5QrCode.start(
     { facingMode: "environment" },
     scanConfig,
@@ -212,6 +278,33 @@ function startCamera() {
     alert("Kamera-Fehler: " + err);
     stopCamera();
   });
+}
+
+// Kamera und Streams sicher beenden
+function stopCamera() {
+  // 1. Native Ressourcen stoppen
+  if (nativeInterval) {
+    clearInterval(nativeInterval);
+    nativeInterval = null;
+  }
+  if (nativeStream) {
+    nativeStream.getTracks().forEach(track => track.stop());
+    nativeStream = null;
+  }
+
+  const nativeVideo = document.getElementById('native-video');
+  if (nativeVideo) nativeVideo.classList.add('hidden');
+
+  // 2. HTML5 QrCode stoppen
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => {
+      readerContainer.classList.add('hidden');
+    }).catch(() => {
+      readerContainer.classList.add('hidden');
+    });
+  } else {
+    readerContainer.classList.add('hidden');
+  }
 }
 
 // Barcode erkannt -> Produktsuche mit Fallback
@@ -309,16 +402,6 @@ function handleOcrImageUpload(event) {
   };
 
   reader.readAsDataURL(file);
-}
-
-function stopCamera() {
-  if (html5QrCode) {
-    html5QrCode.stop().then(() => {
-      readerContainer.classList.add('hidden');
-    }).catch(() => {});
-  } else {
-    readerContainer.classList.add('hidden');
-  }
 }
 
 // In Firebase Cloud speichern

@@ -1,148 +1,487 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Smart Supplement Box Dashboard</title>
-  <link rel="stylesheet" href="style.css">
+// Firebase-Konfiguration
+const firebaseConfig = {
+  apiKey: "AIzaSyDnwoB8gFLlEOCuLd5IAe6h3SL3rVUjT-k",
+  authDomain: "smartbox-db.firebaseapp.com",
+  databaseURL: "https://smartbox-db-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "smartbox-db",
+  storageBucket: "smartbox-db.firebasestorage.app",
+  messagingSenderId: "956387582755",
+  appId: "1:956387582755:web:5687600ce69a0d0bb9a296"
+};
+
+// Sichere Initialisierung von Firebase (Compat SDK v9)
+let database;
+try {
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+  database = firebase.database();
+} catch (e) {
+  console.error("Firebase Init Fehler:", e);
+}
+
+let currentProfile = "Sebi";
+let slotsData = {};
+let html5QrCode = null;
+let currentScannedName = "";
+
+// Native Scanner Variablen
+let nativeStream = null;
+let nativeInterval = null;
+
+// Helper: Verhindert Abstürze durch Storage-Restrictions
+function getSafeStorage(key, fallback) {
+  try {
+    return window.localStorage ? window.localStorage.getItem(key) || fallback : fallback;
+  } catch (e) {
+    console.warn("Storage blockiert, verwende Fallback:", fallback);
+    return fallback;
+  }
+}
+
+function setSafeStorage(key, value) {
+  try {
+    if (window.localStorage) {
+      window.localStorage.setItem(key, value);
+    }
+  } catch (e) {
+    console.warn("Storage blockiert, konnte nicht schreiben:", e);
+  }
+}
+
+// DOM-Elemente
+let btnStartScan, btnStopScan, readerContainer, scanResult, productNameEl, btnSaveSlot;
+let userProfileInput, btnLoadProfile, activeProfileName;
+let btnManualEntry, btnEditName;
+let btnOcrScan, ocrFileInput;
+
+document.addEventListener('DOMContentLoaded', () => {
+  btnStartScan = document.getElementById('btn-start-scan');
+  btnStopScan = document.getElementById('btn-stop-scan');
+  readerContainer = document.getElementById('reader-container');
+  scanResult = document.getElementById('scan-result');
+  productNameEl = document.getElementById('product-name');
+  btnSaveSlot = document.getElementById('btn-save-slot');
+
+  userProfileInput = document.getElementById('user-profile-input');
+  btnLoadProfile = document.getElementById('btn-load-profile');
+  activeProfileName = document.getElementById('active-profile-name');
+
+  btnManualEntry = document.getElementById('btn-manual-entry');
+  btnEditName = document.getElementById('btn-edit-name');
+
+  btnOcrScan = document.getElementById('btn-ocr-scan');
+  ocrFileInput = document.getElementById('ocr-file-input');
+
+  currentProfile = getSafeStorage('smartbox_last_profile', 'Sebi');
+  if (userProfileInput) userProfileInput.value = currentProfile;
   
-  <!-- Firebase SDKs (v9 Compat - MÜSSEN ganz oben stehen!) -->
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+  listenToCloudData(currentProfile);
 
-  <!-- HTML5-QRCode Bibliothek für den Barcode/QR-Scan -->
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-</head>
-<body>
+  if (btnStartScan) btnStartScan.addEventListener('click', startCamera);
+  if (btnStopScan) btnStopScan.addEventListener('click', stopCamera);
+  if (btnSaveSlot) btnSaveSlot.addEventListener('click', saveProductToSlot);
+  
+  if (btnLoadProfile) {
+    btnLoadProfile.addEventListener('click', () => {
+      const newProfile = userProfileInput.value.trim() || "Sebi";
+      currentProfile = newProfile;
+      setSafeStorage('smartbox_last_profile', currentProfile);
+      listenToCloudData(currentProfile);
+    });
+  }
 
-  <header>
-    <h1>Smarte Supplementbox</h1>
-    <p>OTH Regensburg - Vertiefung Mess- & Sensortechnik</p>
-    <p>Sarah Aljleilati, Ben Burger, Dominik Herzog, Sebastian Kumpfmüller</p>
-  </header>
+  // 1. Manuelle Eingabe ohne Kamera
+  if (btnManualEntry) {
+    btnManualEntry.addEventListener('click', () => {
+      stopCamera();
+      const inputName = prompt("Name des Präparats / Nahrungsergänzungsmittels eingeben:", "");
+      if (inputName && inputName.trim() !== "") {
+        currentScannedName = inputName.trim();
+        productNameEl.innerText = currentScannedName;
+        scanResult.classList.remove('hidden');
+      }
+    });
+  }
 
-  <main class="container">
+  // 2. Produktnamen anpassen
+  if (btnEditName) {
+    btnEditName.addEventListener('click', () => {
+      const newName = prompt("Produktname anpassen:", currentScannedName);
+      if (newName && newName.trim() !== "") {
+        currentScannedName = newName.trim();
+        productNameEl.innerText = currentScannedName;
+      }
+    });
+  }
 
-    <!-- Profil- & Name-Auswahl -->
-    <section class="card profile-card">
-      <h2>Profil auswählen</h2>
-      <div class="profile-input-group">
-        <input type="text" id="user-profile-input" placeholder="Name oder Box-ID eingeben (z. B. Sebi)" value="Sebi">
-        <button id="btn-load-profile" class="btn btn-primary btn-inline">Laden</button>
-      </div>
-      <p class="active-profile-info">Aktuelles Profil: <strong id="active-profile-name">Sebi</strong></p>
-    </section>
+  // 3. OCR Foto-Scan auslösen (falls Element vorhanden)
+  if (btnOcrScan && ocrFileInput) {
+    btnOcrScan.addEventListener('click', () => {
+      stopCamera();
+      ocrFileInput.click();
+    });
+
+    ocrFileInput.addEventListener('change', handleOcrImageUpload);
+  }
+});
+
+// Echtzeit-Verbindung zur Firebase Realtime Database
+function listenToCloudData(profileName) {
+  if (activeProfileName) activeProfileName.innerText = profileName;
+
+  if (!database) {
+    alert("Firebase konnte nicht geladen werden.");
+    return;
+  }
+
+  database.ref(`profiles/${profileName}`).on('value', (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      slotsData = data;
+    } else {
+      slotsData = {
+        1: { name: 'Leer', count: 0 },
+        2: { name: 'Leer', count: 0 },
+        3: { name: 'Leer', count: 0 },
+        4: { name: 'Leer', count: 0 }
+      };
+      database.ref(`profiles/${profileName}`).set(slotsData);
+    }
+    updateUI();
+  }, (error) => {
+    alert("Firebase Fehler: " + error.message);
+  });
+}
+
+// Kamera-Start (Wählt hardwarebeschleunigte Engine falls verfügbar)
+function startCamera() {
+  readerContainer.classList.remove('hidden');
+  scanResult.classList.add('hidden');
+
+  if ('BarcodeDetector' in window) {
+    startNativeHardwareScanner();
+  } else {
+    startHtml5QrcodeScanner();
+  }
+}
+
+// Native Hardware-Engine (Ideal für schwierige Blickwinkel & Krümmungen)
+async function startNativeHardwareScanner() {
+  let nativeVideo = document.getElementById('native-video');
+  const readerDiv = document.getElementById('reader');
+
+  // Dynamisch das native Video-Element erzeugen, falls es nicht in der HTML steht
+  if (!nativeVideo) {
+    nativeVideo = document.createElement('video');
+    nativeVideo.id = 'native-video';
+    nativeVideo.setAttribute('playsinline', 'true');
+    nativeVideo.style.width = '100%';
+    nativeVideo.style.borderRadius = '8px';
+    nativeVideo.style.background = '#000';
+    readerContainer.insertBefore(nativeVideo, btnStopScan);
+  }
+
+  if (readerDiv) readerDiv.classList.add('hidden');
+  nativeVideo.classList.remove('hidden');
+
+  try {
+    const barcodeDetector = new BarcodeDetector({
+      formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e']
+    });
+
+    nativeStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "environment",
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      }
+    });
+
+    nativeVideo.srcObject = nativeStream;
+    await nativeVideo.play();
+
+    // Optischen Zoom anfordern falls unterstützt
+    try {
+      const track = nativeStream.getVideoTracks()[0];
+      const capabilities = track.getCapabilities();
+      if (capabilities && capabilities.zoom) {
+        const targetZoom = Math.min(capabilities.zoom.max, 2.0);
+        track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
+      }
+    } catch (e) {
+      console.log("Native Zoom nicht unterstützt:", e);
+    }
+
+    nativeInterval = setInterval(async () => {
+      try {
+        const barcodes = await barcodeDetector.detect(nativeVideo);
+        if (barcodes.length > 0) {
+          stopCamera();
+          onBarcodeScanned(barcodes[0].rawValue);
+        }
+      } catch (e) {
+        console.error("Native Scan Fehler:", e);
+      }
+    }, 150);
+
+  } catch (err) {
+    console.warn("Native Scanner fehlgeschlagen, schalte auf HTML5 Fallback um:", err);
+    startHtml5QrcodeScanner();
+  }
+}
+
+// Fallback: html5-qrcode
+function startHtml5QrcodeScanner() {
+  const nativeVideo = document.getElementById('native-video');
+  const readerDiv = document.getElementById('reader');
+
+  if (nativeVideo) nativeVideo.classList.add('hidden');
+  if (readerDiv) readerDiv.classList.remove('hidden');
+
+  const formatsToSupport = [
+    Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.UPC_A,
+    Html5QrcodeSupportedFormats.UPC_E
+  ];
+
+  html5QrCode = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport });
+
+  const scanConfig = {
+    fps: 30,
+    qrbox: function(viewfinderWidth, viewfinderHeight) {
+      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+      return {
+        width: Math.floor(viewfinderWidth * 0.9),
+        height: Math.floor(minEdge * 0.35)
+      };
+    },
+    aspectRatio: 1.0,
+    videoConstraints: {
+      facingMode: "environment",
+      width: { ideal: 1920 },
+      height: { ideal: 1080 }
+    }
+  };
+
+  html5QrCode.start(
+    { facingMode: "environment" },
+    scanConfig,
+    onBarcodeScanned
+  ).then(() => {
+    try {
+      const track = html5QrCode.getRunningTrack();
+      const capabilities = track.getCapabilities();
+      if (capabilities && capabilities.zoom) {
+        const targetZoom = Math.min(capabilities.zoom.max, 2.0);
+        track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
+      }
+    } catch (e) {
+      console.log("Zoom nicht unterstützt:", e);
+    }
+  }).catch(err => {
+    alert("Kamera-Fehler: " + err);
+    stopCamera();
+  });
+}
+
+// Kamera stoppen
+function stopCamera() {
+  if (nativeInterval) {
+    clearInterval(nativeInterval);
+    nativeInterval = null;
+  }
+  if (nativeStream) {
+    nativeStream.getTracks().forEach(track => track.stop());
+    nativeStream = null;
+  }
+
+  const nativeVideo = document.getElementById('native-video');
+  if (nativeVideo) nativeVideo.classList.add('hidden');
+
+  if (html5QrCode) {
+    html5QrCode.stop().then(() => {
+      readerContainer.classList.add('hidden');
+    }).catch(() => {
+      readerContainer.classList.add('hidden');
+    });
+  } else {
+    readerContainer.classList.add('hidden');
+  }
+}
+
+// Barcode verarbeiten -> Open Food Facts Abfrage
+function onBarcodeScanned(decodedText) {
+  stopCamera();
+  
+  productNameEl.innerText = "Lade Produktdaten...";
+  scanResult.classList.remove('hidden');
+
+  fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`)
+    .then(res => res.json())
+    .then(data => {
+      let detectedName = "";
+
+      if (data.status === 1 && data.product) {
+        const p = data.product;
+        const baseName = p.product_name_de || p.product_name || p.generic_name_de || p.generic_name;
+        const brand = p.brands ? p.brands.split(',')[0].trim() : "";
+
+        if (baseName && brand) {
+          detectedName = `${brand} ${baseName}`;
+        } else if (baseName) {
+          detectedName = baseName;
+        } else if (brand) {
+          detectedName = `${brand} Präparat`;
+        }
+      }
+
+      if (!detectedName) {
+        detectedName = `Präparat (EAN: ${decodedText})`;
+        setTimeout(() => {
+          const manualFix = prompt(`Barcode ${decodedText} nicht in der Datenbank gefunden. Wie heißt das Produkt?`, "");
+          if (manualFix && manualFix.trim() !== "") {
+            currentScannedName = manualFix.trim();
+            productNameEl.innerText = currentScannedName;
+          }
+        }, 300);
+      }
+
+      currentScannedName = detectedName;
+      productNameEl.innerText = currentScannedName;
+    })
+    .catch(() => {
+      currentScannedName = `Präparat (EAN: ${decodedText})`;
+      productNameEl.innerText = currentScannedName;
+    });
+}
+
+// OCR-Backend Anbindung
+function handleOcrImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  productNameEl.innerText = "Lese Zahl vom Foto (OCR)...";
+  scanResult.classList.remove('hidden');
+
+  const reader = new FileReader();
+  
+  reader.onload = async function(e) {
+    const base64Image = e.target.result;
+    const selectedSlot = document.getElementById('slot-select')?.value || "1";
+    const activeProfile = (typeof currentProfile !== 'undefined' && currentProfile) ? currentProfile : "Sebi";
+
+    try {
+      const response = await fetch('https://integrity-museums-prohibited-bigger.trycloudflare.com/api/ocr-scan', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          image: base64Image,
+          profile: activeProfile,
+          slot: selectedSlot
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        currentScannedName = result.detectedCode;
+        productNameEl.innerText = currentScannedName;
+        alert(`OCR Erfolgreich! Erkannter Code '${result.detectedCode}' wurde in Firebase gespeichert.`);
+      } else {
+        alert("OCR Fehler: " + (result.message || result.error));
+        productNameEl.innerText = "Zahl nicht erkannt";
+      }
+    } catch (error) {
+      console.error("OCR Request Fehler:", error);
+      alert("Fehler: Verbindung zum OCR-Server fehlgeschlagen.");
+      productNameEl.innerText = "Verbindungsfehler";
+    } finally {
+      if (ocrFileInput) ocrFileInput.value = "";
+    }
+  };
+
+  reader.readAsDataURL(file);
+}
+
+// Speichern in Firebase Realtime Database
+function saveProductToSlot() {
+  const selectedSlot = document.getElementById('slot-select').value;
+  const count = parseInt(document.getElementById('pill-count').value) || 0;
+
+  if (!currentScannedName || currentScannedName === "-") {
+    alert("Bitte gib zuerst einen Produktnamen ein oder scanne einen Barcode.");
+    return;
+  }
+
+  slotsData[selectedSlot] = {
+    name: currentScannedName,
+    count: count
+  };
+
+  database.ref(`profiles/${currentProfile}`).set(slotsData)
+    .then(() => {
+      scanResult.classList.add('hidden');
+      alert(`Erfolgreich gespeichert für [${currentProfile}]:\n${currentScannedName} in Behälter ${selectedSlot}`);
+    })
+    .catch(err => alert("Speicherfehler: " + err));
+}
+
+// Entnahme simulieren
+function simulateTakePill(slotId) {
+  if (slotsData[slotId] && slotsData[slotId].count > 0) {
+    slotsData[slotId].count--;
     
-    <!-- Bereich 1: Barcode Scanner & Befüll-Assistent -->
-    <section class="card scanner-card">
-      <h2>Neues Supplement hinzufügen</h2>
-      
-      <!-- Wahlmöglichkeiten für den Nutzer -->
-      <div class="action-buttons" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
-        <button id="btn-start-scan" class="btn btn-primary" style="flex: 1; min-width: 140px;">📷 Barcode scannen</button>
-        <button id="btn-manual-entry" class="btn btn-primary" style="flex: 1; min-width: 140px; background-color: #3498db;">✏️ Name manuell eingeben</button>
-      </div>
-      
-      <!-- Video-Fenster für die Smartphone-Kamera -->
-      <div id="reader-container" class="hidden">
-        <div id="reader"></div>
-        <button id="btn-stop-scan" class="btn btn-danger">Abbrechen</button>
-      </div>
+    if (slotsData[slotId].count === 0) {
+      slotsData[slotId].name = "Leer";
+    }
 
-      <!-- Anzeigebereich für gescanntes / manuell eingegebenes Produkt -->
-      <div id="scan-result" class="hidden">
-        <p class="scan-label">Ausgewähltes Produkt:</p>
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem;">
-          <p id="product-name" class="product-title" style="margin: 0; font-weight: bold; font-size: 1.2rem;">-</p>
-          <button id="btn-edit-name" class="btn btn-small" style="width: auto; padding: 0.4rem 0.8rem;" title="Name anpassen">✏️ Ändern</button>
-        </div>
-        
-        <div class="assign-group">
-          <label for="slot-select">Behälter zuweisen:</label>
-          <select id="slot-select">
-            <option value="1">Behälter 1</option>
-            <option value="2">Behälter 2</option>
-            <option value="3">Behälter 3</option>
-            <option value="4">Behälter 4</option>
-          </select>
-        </div>
+    const ledEl = document.getElementById(`led-${slotId}`);
+    if (ledEl) {
+      ledEl.classList.add('active-green');
+      setTimeout(() => ledEl.classList.remove('active-green'), 1500);
+    }
 
-        <div class="assign-group">
-          <label for="pill-count">Anzahl Tabletten:</label>
-          <input type="number" id="pill-count" value="30" min="1">
-        </div>
+    database.ref(`profiles/${currentProfile}`).set(slotsData);
+  } else {
+    alert(`Behälter ${slotId} ist bereits leer!`);
+  }
+}
 
-        <button id="btn-save-slot" class="btn btn-success" style="margin-top: 1rem;">Behälter befüllen & speichern</button>
-      </div>
-    </section>
+// UI-Anzeige synchronisieren
+function updateUI() {
+  for (let i = 1; i <= 4; i++) {
+    if (slotsData[i]) {
+      const nameEl = document.getElementById(`name-${i}`);
+      const countEl = document.getElementById(`count-${i}`);
+      const cardEl = document.getElementById(`slot-card-${i}`);
+      const ledEl = document.getElementById(`led-${i}`);
 
-    <!-- Bereich 2: Das 4-Kacheln Dashboard der Box -->
-    <section class="dashboard">
-      <h2>Übersicht der Behälter</h2>
-      <div class="grid">
-        
-        <!-- Behälter 1 -->
-        <div class="slot-card" id="slot-card-1">
-          <div class="slot-header">
-            <h3>Behälter 1</h3>
-            <span class="status-led" id="led-1"></span>
-          </div>
-          <p class="med-name" id="name-1">Lade Cloud-Daten...</p>
-          <div class="count-display">
-            <span class="count-number" id="count-1">0</span>
-            <span class="count-unit">Stk.</span>
-          </div>
-          <button class="btn btn-small" onclick="simulateTakePill(1)">Eingenommen</button>
-        </div>
+      const count = slotsData[i].count || 0;
+      const displayName = (count === 0) ? "Leer" : (slotsData[i].name || "Leer");
 
-        <!-- Behälter 2 -->
-        <div class="slot-card" id="slot-card-2">
-          <div class="slot-header">
-            <h3>Behälter 2</h3>
-            <span class="status-led" id="led-2"></span>
-          </div>
-          <p class="med-name" id="name-2">Lade Cloud-Daten...</p>
-          <div class="count-display">
-            <span class="count-number" id="count-2">0</span>
-            <span class="count-unit">Stk.</span>
-          </div>
-          <button class="btn btn-small" onclick="simulateTakePill(2)">Eingenommen</button>
-        </div>
+      if (nameEl) nameEl.innerText = displayName;
+      if (countEl) countEl.innerText = count;
 
-        <!-- Behälter 3 -->
-        <div class="slot-card" id="slot-card-3">
-          <div class="slot-header">
-            <h3>Behälter 3</h3>
-            <span class="status-led" id="led-3"></span>
-          </div>
-          <p class="med-name" id="name-3">Lade Cloud-Daten...</p>
-          <div class="count-display">
-            <span class="count-number" id="count-3">0</span>
-            <span class="count-unit">Stk.</span>
-          </div>
-          <button class="btn btn-small" onclick="simulateTakePill(3)">Eingenommen</button>
-        </div>
+      if (cardEl && ledEl) {
+        if (count > 0) {
+          cardEl.classList.remove('empty-slot');
+          cardEl.classList.add('filled-slot');
 
-        <!-- Behälter 4 -->
-        <div class="slot-card" id="slot-card-4">
-          <div class="slot-header">
-            <h3>Behälter 4</h3>
-            <span class="status-led" id="led-4"></span>
-          </div>
-          <p class="med-name" id="name-4">Lade Cloud-Daten...</p>
-          <div class="count-display">
-            <span class="count-number" id="count-4">0</span>
-            <span class="count-unit">Stk.</span>
-          </div>
-          <button class="btn btn-small" onclick="simulateTakePill(4)">Eingenommen</button>
-        </div>
+          ledEl.classList.remove('red');
+          ledEl.classList.add('green');
+        } else {
+          cardEl.classList.remove('filled-slot');
+          cardEl.classList.add('empty-slot');
 
-      </div>
-    </section>
-
-  </main>
-
-  <!-- Hauptlogik -->
-  <script src="app.js"></script>
-</body>
-</html>
+          ledEl.classList.remove('green');
+          ledEl.classList.add('red');
+        }
+      }
+    }
+  }
+}
