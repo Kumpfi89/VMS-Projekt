@@ -255,7 +255,7 @@ function handleOcrImageUpload(event) {
     const selectedSlot = document.getElementById('slot-select')?.value || "1";
 
     try {
-      const response = await fetch('https://warm-toys-eat.loca.lt/api/ocr-scan', {
+      const response = await fetch('https://smartbox-ocr-sebi.loca.lt/api/ocr-scan', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
