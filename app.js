@@ -152,7 +152,7 @@ function startCamera() {
   }
 }
 
-// NATIVE HARDWARE-SCANNER ENGINE MIT ADAPTIVEM MULTI-FRAME-PREPROCESSING
+// SCHLANKE NATIVE HARDWARE-ENGINE (Direkt auf dem Videostream für maximale FPS)
 async function startNativeHardwareScanner() {
   let nativeVideo = document.getElementById('native-video');
   const readerDiv = document.getElementById('reader');
@@ -170,19 +170,9 @@ async function startNativeHardwareScanner() {
   if (readerDiv) readerDiv.classList.add('hidden');
   nativeVideo.classList.remove('hidden');
 
-  // Verstecktes Canvas für die Verarbeitung erzeugen
-  let processCanvas = document.getElementById('process-canvas');
-  if (!processCanvas) {
-    processCanvas = document.createElement('canvas');
-    processCanvas.id = 'process-canvas';
-    processCanvas.style.display = 'none';
-    document.body.appendChild(processCanvas);
-  }
-  const ctx = processCanvas.getContext('2d', { willReadFrequently: true });
-
   try {
     const barcodeDetector = new BarcodeDetector({
-      formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e']
+      formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e', 'code_39', 'codabar']
     });
 
     nativeStream = await navigator.mediaDevices.getUserMedia({
@@ -210,52 +200,20 @@ async function startNativeHardwareScanner() {
       console.log("Zoom nicht angewendet:", e);
     }
 
-    let frameToggle = 0;
-
-    // Mehrstufige Scan-Schleife (scannt abwechselnd Rohbild und optimierte Varianten)
+    // Schnelle Scan-Schleife ohne störende Filter direkt auf dem Rohbild
     nativeInterval = setInterval(async () => {
       try {
-        if (nativeVideo.videoWidth === 0) return;
+        if (nativeVideo.readyState < 2) return;
 
-        // 1. Pass: Erstes schnelles Prüfen direkt auf dem originalen Live-Videobild
-        let barcodes = await barcodeDetector.detect(nativeVideo);
-        if (barcodes.length > 0) {
-          stopCamera();
-          onBarcodeScanned(barcodes[0].rawValue);
-          return;
-        }
-
-        // 2. Pass: Falls Rohbild scheitert -> Bild auf Canvas vorverarbeiten
-        processCanvas.width = nativeVideo.videoWidth;
-        processCanvas.height = nativeVideo.videoHeight;
-        ctx.drawImage(nativeVideo, 0, 0, processCanvas.width, processCanvas.height);
-
-        const imgData = ctx.getImageData(0, 0, processCanvas.width, processCanvas.height);
-        const data = imgData.data;
-
-        // Abwechselnder Schwellenwert (100 für helle Glanzflecken, 150 für farbige Hintergründe)
-        const currentThreshold = (frameToggle % 2 === 0) ? 100 : 150;
-        frameToggle++;
-
-        for (let i = 0; i < data.length; i += 4) {
-          const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-          const val = avg < currentThreshold ? 0 : 255;
-          data[i] = val;     // R
-          data[i + 1] = val; // G
-          data[i + 2] = val; // B
-        }
-        ctx.putImageData(imgData, 0, 0);
-
-        // Auf dem aufbereiteten Canvas scannen
-        barcodes = await barcodeDetector.detect(processCanvas);
+        const barcodes = await barcodeDetector.detect(nativeVideo);
         if (barcodes.length > 0) {
           stopCamera();
           onBarcodeScanned(barcodes[0].rawValue);
         }
       } catch (e) {
-        console.error("Scan Schleifen-Fehler:", e);
+        console.error("Native Scan Fehler:", e);
       }
-    }, 120);
+    }, 100);
 
   } catch (err) {
     console.warn("Native Scanner fehlgeschlagen, schalte auf HTML5 Fallback um:", err);
