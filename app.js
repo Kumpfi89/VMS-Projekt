@@ -152,7 +152,7 @@ function startCamera() {
   }
 }
 
-// Native Hardware-Engine (Ideal für schwierige Blickwinkel & Krümmungen)
+// NATIVE HARDWARE-SCANNER ENGINE MIT BILDVORVERARBEITUNG (Canvas Thresholding)
 async function startNativeHardwareScanner() {
   let nativeVideo = document.getElementById('native-video');
   const readerDiv = document.getElementById('reader');
@@ -170,6 +170,16 @@ async function startNativeHardwareScanner() {
   if (readerDiv) readerDiv.classList.add('hidden');
   nativeVideo.classList.remove('hidden');
 
+  // Canvas für Echtzeit-Preprocessing erzeugen
+  let processCanvas = document.getElementById('process-canvas');
+  if (!processCanvas) {
+    processCanvas = document.createElement('canvas');
+    processCanvas.id = 'process-canvas';
+    processCanvas.style.display = 'none';
+    document.body.appendChild(processCanvas);
+  }
+  const ctx = processCanvas.getContext('2d', { willReadFrequently: true });
+
   try {
     const barcodeDetector = new BarcodeDetector({
       formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e']
@@ -186,6 +196,7 @@ async function startNativeHardwareScanner() {
     nativeVideo.srcObject = nativeStream;
     await nativeVideo.play();
 
+    // Optischen Zoom aktivieren (falls vorhanden)
     try {
       const track = nativeStream.getVideoTracks()[0];
       const capabilities = track.getCapabilities();
@@ -197,9 +208,31 @@ async function startNativeHardwareScanner() {
       console.log("Native Zoom nicht unterstützt:", e);
     }
 
+    // Schleife zur Barcode-Erkennung auf dem optimierten Frame
     nativeInterval = setInterval(async () => {
       try {
-        const barcodes = await barcodeDetector.detect(nativeVideo);
+        if (nativeVideo.videoWidth === 0) return;
+
+        processCanvas.width = nativeVideo.videoWidth;
+        processCanvas.height = nativeVideo.videoHeight;
+
+        // 1. Frame auf Canvas zeichnen
+        ctx.drawImage(nativeVideo, 0, 0, processCanvas.width, processCanvas.height);
+
+        // 2. Binarisierung (Glanzflecken & farbige Hintergründe ausblenden)
+        const imgData = ctx.getImageData(0, 0, processCanvas.width, processCanvas.height);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+          const threshold = avg < 120 ? 0 : 255;
+          data[i] = threshold;     // R
+          data[i + 1] = threshold; // G
+          data[i + 2] = threshold; // B
+        }
+        ctx.putImageData(imgData, 0, 0);
+
+        // 3. Auf bereinigtem Canvas suchen
+        const barcodes = await barcodeDetector.detect(processCanvas);
         if (barcodes.length > 0) {
           stopCamera();
           onBarcodeScanned(barcodes[0].rawValue);
