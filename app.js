@@ -50,7 +50,7 @@ let btnStartScan, btnStopScan, readerContainer, scanResult, productNameEl, btnSa
 let userProfileInput, btnLoadProfile, activeProfileName;
 let btnManualEntry, btnEditName;
 
-// Neue DOM-Elemente für OCR
+// DOM-Elemente für OCR
 let btnOcrScan, ocrFileInput;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -68,7 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
   btnManualEntry = document.getElementById('btn-manual-entry');
   btnEditName = document.getElementById('btn-edit-name');
 
-  // OCR Elemente zuweisen
   btnOcrScan = document.getElementById('btn-ocr-scan');
   ocrFileInput = document.getElementById('ocr-file-input');
 
@@ -153,27 +152,43 @@ function listenToCloudData(profileName) {
   });
 }
 
-// Kamera-Logik starten (Barcode)
+// Kamera-Logik starten (Barcode) - Optimiert für kleine/gekrümmte Barcodes
 function startCamera() {
   readerContainer.classList.remove('hidden');
   scanResult.classList.add('hidden');
 
-  html5QrCode = new Html5Qrcode("reader");
+  // Erkennung auf klassische 1D-Barcodes fokussieren für maximale Performance
+  const formatsToSupport = [
+    Html5QrcodeSupportedFormats.EAN_13,
+    Html5QrcodeSupportedFormats.EAN_8,
+    Html5QrcodeSupportedFormats.CODE_128,
+    Html5QrcodeSupportedFormats.UPC_A,
+    Html5QrcodeSupportedFormats.UPC_E
+  ];
+
+  html5QrCode = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport });
   
+  // Hohe Kameraauflösung anfordern (Full-HD)
+  const videoConstraints = {
+    facingMode: "environment",
+    width: { ideal: 1920 },
+    height: { ideal: 1080 }
+  };
+
   const scanConfig = {
-    fps: 20,
+    fps: 30, // 30 FPS für schnellere Scharfstellung
     qrbox: function(viewfinderWidth, viewfinderHeight) {
       const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
       return {
-        width: Math.floor(viewfinderWidth * 0.85),
-        height: Math.floor(minEdge * 0.5)
+        width: Math.floor(viewfinderWidth * 0.9),
+        height: Math.floor(minEdge * 0.35) // Schmaler Streifen ist ideal für 1D-Strichcodes
       };
     },
     aspectRatio: 1.0
   };
 
   html5QrCode.start(
-    { facingMode: "environment" },
+    videoConstraints,
     scanConfig,
     onBarcodeScanned
   ).then(() => {
@@ -181,7 +196,8 @@ function startCamera() {
       const track = html5QrCode.getRunningTrack();
       const capabilities = track.getCapabilities();
       if (capabilities && capabilities.zoom) {
-        const targetZoom = Math.min(capabilities.zoom.max, 1.8);
+        // Zoom leicht anheben (2.0x), damit man Abstand halten kann (flacht Rundungen optisch ab)
+        const targetZoom = Math.min(capabilities.zoom.max, 2.0);
         track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
       }
     } catch (e) {
