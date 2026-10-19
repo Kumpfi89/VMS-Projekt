@@ -157,7 +157,7 @@ function startCamera() {
   readerContainer.classList.remove('hidden');
   scanResult.classList.add('hidden');
 
-  // Erkennung auf klassische 1D-Barcodes fokussieren für maximale Performance
+  // Erkennung auf klassische 1D-Barcodes fokussieren
   const formatsToSupport = [
     Html5QrcodeSupportedFormats.EAN_13,
     Html5QrcodeSupportedFormats.EAN_8,
@@ -167,28 +167,28 @@ function startCamera() {
   ];
 
   html5QrCode = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport });
-  
-  // Hohe Kameraauflösung anfordern (Full-HD)
-  const videoConstraints = {
-    facingMode: "environment",
-    width: { ideal: 1920 },
-    height: { ideal: 1080 }
-  };
 
+  // Konfiguration für Auflösung, FPS und das Scan-Sichtfeld
   const scanConfig = {
-    fps: 30, // 30 FPS für schnellere Scharfstellung
+    fps: 30,
     qrbox: function(viewfinderWidth, viewfinderHeight) {
       const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
       return {
         width: Math.floor(viewfinderWidth * 0.9),
-        height: Math.floor(minEdge * 0.35) // Schmaler Streifen ist ideal für 1D-Strichcodes
+        height: Math.floor(minEdge * 0.35)
       };
     },
-    aspectRatio: 1.0
+    aspectRatio: 1.0,
+    videoConstraints: {
+      facingMode: "environment",
+      width: { ideal: 1920 },
+      height: { ideal: 1080 }
+    }
   };
 
+  // Erster Parameter hat exakt 1 Key ({ facingMode: "environment" })
   html5QrCode.start(
-    videoConstraints,
+    { facingMode: "environment" },
     scanConfig,
     onBarcodeScanned
   ).then(() => {
@@ -196,7 +196,6 @@ function startCamera() {
       const track = html5QrCode.getRunningTrack();
       const capabilities = track.getCapabilities();
       if (capabilities && capabilities.zoom) {
-        // Zoom leicht anheben (2.0x), damit man Abstand halten kann (flacht Rundungen optisch ab)
         const targetZoom = Math.min(capabilities.zoom.max, 2.0);
         track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
       }
