@@ -252,18 +252,21 @@ function handleOcrImageUpload(event) {
   
   reader.onload = async function(e) {
     const base64Image = e.target.result;
+    
+    // Sichere Fallback-Werte ermitteln
     const selectedSlot = document.getElementById('slot-select')?.value || "1";
+    const activeProfile = (typeof currentProfile !== 'undefined' && currentProfile) ? currentProfile : "Sebi";
 
     try {
+      // Reiner Standard-POST-Request ohne Custom-Header
       const response = await fetch('https://smartbox-ocr-sebi.loca.lt/api/ocr-scan', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json',
-          'Bypass-Tunnel-Reminder': 'true' // Verhindert die Localtunnel-Warnseite
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           image: base64Image,
-          profile: currentProfile,
+          profile: activeProfile,
           slot: selectedSlot
         })
       });
@@ -282,8 +285,10 @@ function handleOcrImageUpload(event) {
       console.error("OCR Request Fehler:", error);
       alert("Fehler: Verbindung zum OCR-Server fehlgeschlagen.");
       productNameEl.innerText = "Verbindungsfehler";
+    } finally {
+      if (ocrFileInput) ocrFileInput.value = "";
     }
-  }; // <-- onload Endklammer gefixt
+  };
 
   reader.readAsDataURL(file);
 }
