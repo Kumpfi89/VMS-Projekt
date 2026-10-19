@@ -152,7 +152,7 @@ function startCamera() {
   }
 }
 
-// NATIVE HARDWARE-SCANNER ENGINE MIT BILDVORVERARBEITUNG (Canvas Thresholding)
+// NATIVE HARDWARE-SCANNER ENGINE MIT ADAPTIVEM MULTI-FRAME-PREPROCESSING
 async function startNativeHardwareScanner() {
   let nativeVideo = document.getElementById('native-video');
   const readerDiv = document.getElementById('reader');
@@ -170,7 +170,7 @@ async function startNativeHardwareScanner() {
   if (readerDiv) readerDiv.classList.add('hidden');
   nativeVideo.classList.remove('hidden');
 
-  // Canvas für Echtzeit-Preprocessing erzeugen
+  // Verstecktes Canvas für die Verarbeitung erzeugen
   let processCanvas = document.getElementById('process-canvas');
   if (!processCanvas) {
     processCanvas = document.createElement('canvas');
@@ -196,7 +196,7 @@ async function startNativeHardwareScanner() {
     nativeVideo.srcObject = nativeStream;
     await nativeVideo.play();
 
-    // Optischen Zoom sicher anfordern
+    // Optischen Zoom aktivieren (falls vorhanden)
     try {
       const track = nativeStream.getVideoTracks()[0];
       if (track && track.getCapabilities) {
@@ -207,42 +207,55 @@ async function startNativeHardwareScanner() {
         }
       }
     } catch (e) {
-      console.log("Native Zoom nicht angewendet:", e);
+      console.log("Zoom nicht angewendet:", e);
     }
 
-    // Schleife zur Barcode-Erkennung auf dem optimierten Frame
+    let frameToggle = 0;
+
+    // Mehrstufige Scan-Schleife (scannt abwechselnd Rohbild und optimierte Varianten)
     nativeInterval = setInterval(async () => {
       try {
         if (nativeVideo.videoWidth === 0) return;
 
+        // 1. Pass: Erstes schnelles Prüfen direkt auf dem originalen Live-Videobild
+        let barcodes = await barcodeDetector.detect(nativeVideo);
+        if (barcodes.length > 0) {
+          stopCamera();
+          onBarcodeScanned(barcodes[0].rawValue);
+          return;
+        }
+
+        // 2. Pass: Falls Rohbild scheitert -> Bild auf Canvas vorverarbeiten
         processCanvas.width = nativeVideo.videoWidth;
         processCanvas.height = nativeVideo.videoHeight;
-
-        // 1. Frame auf Canvas zeichnen
         ctx.drawImage(nativeVideo, 0, 0, processCanvas.width, processCanvas.height);
 
-        // 2. Binarisierung (Glanzflecken & farbige Hintergründe ausblenden)
         const imgData = ctx.getImageData(0, 0, processCanvas.width, processCanvas.height);
         const data = imgData.data;
+
+        // Abwechselnder Schwellenwert (100 für helle Glanzflecken, 150 für farbige Hintergründe)
+        const currentThreshold = (frameToggle % 2 === 0) ? 100 : 150;
+        frameToggle++;
+
         for (let i = 0; i < data.length; i += 4) {
           const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-          const threshold = avg < 120 ? 0 : 255;
-          data[i] = threshold;     // R
-          data[i + 1] = threshold; // G
-          data[i + 2] = threshold; // B
+          const val = avg < currentThreshold ? 0 : 255;
+          data[i] = val;     // R
+          data[i + 1] = val; // G
+          data[i + 2] = val; // B
         }
         ctx.putImageData(imgData, 0, 0);
 
-        // 3. Auf bereinigtem Canvas suchen
-        const barcodes = await barcodeDetector.detect(processCanvas);
+        // Auf dem aufbereiteten Canvas scannen
+        barcodes = await barcodeDetector.detect(processCanvas);
         if (barcodes.length > 0) {
           stopCamera();
           onBarcodeScanned(barcodes[0].rawValue);
         }
       } catch (e) {
-        console.error("Native Scan Fehler:", e);
+        console.error("Scan Schleifen-Fehler:", e);
       }
-    }, 150);
+    }, 120);
 
   } catch (err) {
     console.warn("Native Scanner fehlgeschlagen, schalte auf HTML5 Fallback um:", err);
