@@ -252,13 +252,10 @@ function handleOcrImageUpload(event) {
   
   reader.onload = async function(e) {
     const base64Image = e.target.result;
-    
-    // Sichere Fallback-Werte ermitteln
     const selectedSlot = document.getElementById('slot-select')?.value || "1";
     const activeProfile = (typeof currentProfile !== 'undefined' && currentProfile) ? currentProfile : "Sebi";
 
-   try {
-      // Cloudflare URL inklusive Endpunkt /api/ocr-scan
+    try {
       const response = await fetch('https://integrity-museums-prohibited-bigger.trycloudflare.com/api/ocr-scan', {
         method: 'POST',
         headers: { 
@@ -274,7 +271,7 @@ function handleOcrImageUpload(event) {
       const result = await response.json();
 
       if (result.success) {
-        currentScannedName = `Code: ${result.detectedCode}`;
+        currentScannedName = result.detectedCode;
         productNameEl.innerText = currentScannedName;
         alert(`OCR Erfolgreich! Erkannter Code '${result.detectedCode}' wurde in Firebase gespeichert.`);
       } else {
@@ -331,7 +328,6 @@ function simulateTakePill(slotId) {
   if (slotsData[slotId] && slotsData[slotId].count > 0) {
     slotsData[slotId].count--;
     
-    // Sobald count == 0 erreicht ist, schaltet der Name wieder auf "Leer"
     if (slotsData[slotId].count === 0) {
       slotsData[slotId].name = "Leer";
     }
