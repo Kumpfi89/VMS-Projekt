@@ -1,4 +1,4 @@
-// Eure Firebase-Konfiguration
+// Firebase-Konfiguration
 const firebaseConfig = {
   apiKey: "AIzaSyDnwoB8gFLlEOCuLd5IAe6h3SL3rVUjT-k",
   authDomain: "smartbox-db.firebaseapp.com",
@@ -9,7 +9,7 @@ const firebaseConfig = {
   appId: "1:956387582755:web:5687600ce69a0d0bb9a296"
 };
 
-// Sichere Initialisierung von Firebase
+// Sichere Initialisierung von Firebase (Compat SDK v9)
 let database;
 try {
   if (!firebase.apps.length) {
@@ -29,7 +29,7 @@ let currentScannedName = "";
 let nativeStream = null;
 let nativeInterval = null;
 
-// Helper: Verhindert Abstürze durch Tracking Prevention
+// Helper: Verhindert Abstürze durch Storage-Restrictions
 function getSafeStorage(key, fallback) {
   try {
     return window.localStorage ? window.localStorage.getItem(key) || fallback : fallback;
@@ -54,9 +54,6 @@ let btnStartScan, btnStopScan, readerContainer, scanResult, productNameEl, btnSa
 let userProfileInput, btnLoadProfile, activeProfileName;
 let btnManualEntry, btnEditName;
 
-// DOM-Elemente für OCR
-let btnOcrScan, ocrFileInput;
-
 document.addEventListener('DOMContentLoaded', () => {
   btnStartScan = document.getElementById('btn-start-scan');
   btnStopScan = document.getElementById('btn-stop-scan');
@@ -71,9 +68,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnManualEntry = document.getElementById('btn-manual-entry');
   btnEditName = document.getElementById('btn-edit-name');
-
-  btnOcrScan = document.getElementById('btn-ocr-scan');
-  ocrFileInput = document.getElementById('ocr-file-input');
 
   currentProfile = getSafeStorage('smartbox_last_profile', 'Sebi');
   if (userProfileInput) userProfileInput.value = currentProfile;
@@ -93,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 1. Direkt-Option: Name manuell ohne Barcode eingeben
+  // 1. Manuelle Eingabe ohne Kamera
   if (btnManualEntry) {
     btnManualEntry.addEventListener('click', () => {
       stopCamera();
@@ -106,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 2. Option: Aktuellen Namen korrigieren/anpassen
+  // 2. Produktnamen anpassen
   if (btnEditName) {
     btnEditName.addEventListener('click', () => {
       const newName = prompt("Produktname anpassen:", currentScannedName);
@@ -116,19 +110,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-
-  // 3. Option: OCR Foto-Scan auslösen
-  if (btnOcrScan && ocrFileInput) {
-    btnOcrScan.addEventListener('click', () => {
-      stopCamera();
-      ocrFileInput.click();
-    });
-
-    ocrFileInput.addEventListener('change', handleOcrImageUpload);
-  }
 });
 
-// Live-Echtzeit-Verbindung zur Firebase Cloud-Datenbank
+// Echtzeit-Verbindung zur Firebase Realtime Database
 function listenToCloudData(profileName) {
   if (activeProfileName) activeProfileName.innerText = profileName;
 
@@ -156,12 +140,11 @@ function listenToCloudData(profileName) {
   });
 }
 
-// Hauptfunktion zum Starten der Kamera (Nutzt nativen Hardware-Detector falls vorhanden)
+// Kamera-Start (Wählt hardwarebeschleunigte Engine falls verfügbar)
 function startCamera() {
   readerContainer.classList.remove('hidden');
   scanResult.classList.add('hidden');
 
-  // Prüfen, ob das Smartphone die native Barcode-Detector-API besitzt
   if ('BarcodeDetector' in window) {
     startNativeHardwareScanner();
   } else {
@@ -169,12 +152,22 @@ function startCamera() {
   }
 }
 
-// NATIVE HARDWARE-SCANNER ENGINE (Maximale Trefferquote bei Glanz & Rundung)
+// Native Hardware-Engine (Ideal für schwierige Blickwinkel & Krümmungen)
 async function startNativeHardwareScanner() {
-  const nativeVideo = document.getElementById('native-video');
+  let nativeVideo = document.getElementById('native-video');
   const readerDiv = document.getElementById('reader');
 
-  readerDiv.classList.add('hidden');
+  if (!nativeVideo) {
+    nativeVideo = document.createElement('video');
+    nativeVideo.id = 'native-video';
+    nativeVideo.setAttribute('playsinline', 'true');
+    nativeVideo.style.width = '100%';
+    nativeVideo.style.borderRadius = '8px';
+    nativeVideo.style.background = '#000';
+    readerContainer.insertBefore(nativeVideo, btnStopScan);
+  }
+
+  if (readerDiv) readerDiv.classList.add('hidden');
   nativeVideo.classList.remove('hidden');
 
   try {
@@ -193,7 +186,6 @@ async function startNativeHardwareScanner() {
     nativeVideo.srcObject = nativeStream;
     await nativeVideo.play();
 
-    // Zoom versuchsweise aktivieren
     try {
       const track = nativeStream.getVideoTracks()[0];
       const capabilities = track.getCapabilities();
@@ -205,7 +197,6 @@ async function startNativeHardwareScanner() {
       console.log("Native Zoom nicht unterstützt:", e);
     }
 
-    // Schleife zur Barcode-Erkennung
     nativeInterval = setInterval(async () => {
       try {
         const barcodes = await barcodeDetector.detect(nativeVideo);
@@ -224,13 +215,13 @@ async function startNativeHardwareScanner() {
   }
 }
 
-// FALLBACK: Standard html5-qrcode Scanner
+// Fallback: html5-qrcode
 function startHtml5QrcodeScanner() {
   const nativeVideo = document.getElementById('native-video');
   const readerDiv = document.getElementById('reader');
 
-  nativeVideo.classList.add('hidden');
-  readerDiv.classList.remove('hidden');
+  if (nativeVideo) nativeVideo.classList.add('hidden');
+  if (readerDiv) readerDiv.classList.remove('hidden');
 
   const formatsToSupport = [
     Html5QrcodeSupportedFormats.EAN_13,
@@ -280,9 +271,8 @@ function startHtml5QrcodeScanner() {
   });
 }
 
-// Kamera und Streams sicher beenden
+// Kamera stoppen
 function stopCamera() {
-  // 1. Native Ressourcen stoppen
   if (nativeInterval) {
     clearInterval(nativeInterval);
     nativeInterval = null;
@@ -295,7 +285,6 @@ function stopCamera() {
   const nativeVideo = document.getElementById('native-video');
   if (nativeVideo) nativeVideo.classList.add('hidden');
 
-  // 2. HTML5 QrCode stoppen
   if (html5QrCode) {
     html5QrCode.stop().then(() => {
       readerContainer.classList.add('hidden');
@@ -307,7 +296,7 @@ function stopCamera() {
   }
 }
 
-// Barcode erkannt -> Produktsuche mit Fallback
+// Barcode verarbeiten -> Open Food Facts Abfrage
 function onBarcodeScanned(decodedText) {
   stopCamera();
   
@@ -333,7 +322,6 @@ function onBarcodeScanned(decodedText) {
         }
       }
 
-      // Falls Barcode nicht in Open Food Facts gefunden wurde
       if (!detectedName) {
         detectedName = `Präparat (EAN: ${decodedText})`;
         setTimeout(() => {
@@ -354,57 +342,7 @@ function onBarcodeScanned(decodedText) {
     });
 }
 
-// OCR-Foto aufnehmen und an den Node.js Backend-Server senden
-function handleOcrImageUpload(event) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  productNameEl.innerText = "Lese Zahl vom Foto (OCR)...";
-  scanResult.classList.remove('hidden');
-
-  const reader = new FileReader();
-  
-  reader.onload = async function(e) {
-    const base64Image = e.target.result;
-    const selectedSlot = document.getElementById('slot-select')?.value || "1";
-    const activeProfile = (typeof currentProfile !== 'undefined' && currentProfile) ? currentProfile : "Sebi";
-
-    try {
-      const response = await fetch('https://integrity-museums-prohibited-bigger.trycloudflare.com/api/ocr-scan', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          image: base64Image,
-          profile: activeProfile,
-          slot: selectedSlot
-        })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        currentScannedName = result.detectedCode;
-        productNameEl.innerText = currentScannedName;
-        alert(`OCR Erfolgreich! Erkannter Code '${result.detectedCode}' wurde in Firebase gespeichert.`);
-      } else {
-        alert("OCR Fehler: " + (result.message || result.error));
-        productNameEl.innerText = "Zahl nicht erkannt";
-      }
-    } catch (error) {
-      console.error("OCR Request Fehler:", error);
-      alert("Fehler: Verbindung zum OCR-Server fehlgeschlagen.");
-      productNameEl.innerText = "Verbindungsfehler";
-    } finally {
-      if (ocrFileInput) ocrFileInput.value = "";
-    }
-  };
-
-  reader.readAsDataURL(file);
-}
-
-// In Firebase Cloud speichern
+// Speichern in Firebase Realtime Database
 function saveProductToSlot() {
   const selectedSlot = document.getElementById('slot-select').value;
   const count = parseInt(document.getElementById('pill-count').value) || 0;
@@ -448,7 +386,7 @@ function simulateTakePill(slotId) {
   }
 }
 
-// UI aktualisieren (Farbanpassung: >0 Stk. -> Grün, 0 Stk. -> Rot)
+// UI-Anzeige synchronisieren
 function updateUI() {
   for (let i = 1; i <= 4; i++) {
     if (slotsData[i]) {
