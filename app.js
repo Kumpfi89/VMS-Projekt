@@ -254,7 +254,7 @@ function handleOcrImageUpload(event) {
     const selectedSlot = document.getElementById('slot-select')?.value || "1";
 
     try {
-      const response = await fetch('http://10.126.156.189:3000/api/ocr-scan', {
+      const response = await fetch('http://172.20.10.2:3000/api/ocr-scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
