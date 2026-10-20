@@ -1,201 +1,181 @@
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+:root {
+  --bg-color: #f4f6f9;
+  --card-bg: #ffffff;
+  --primary-color: #0066cc;
+  --success-color: #28a745;
+  --danger-color: #dc3545;
+  --text-color: #333333;
 }
 
 body {
-  background-color: #f4f7f6;
-  color: #333;
-  padding: 15px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  margin: 0;
+  padding: 0;
 }
+
+header {
+  background-color: var(--primary-color);
+  color: white;
+  padding: 1rem;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+header h1 { margin: 0; font-size: 1.4rem; }
+header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
 
 .container {
   max-width: 600px;
   margin: 0 auto;
-}
-
-h1 {
-  text-align: center;
-  margin-bottom: 20px;
-  color: #2c3e50;
-  font-size: 1.6rem;
+  padding: 1rem;
 }
 
 .card {
-  background: white;
-  padding: 15px;
+  background: var(--card-bg);
   border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-  margin-bottom: 15px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-.card h3 {
-  margin-bottom: 12px;
-  color: #34495e;
-  border-bottom: 2px solid #ecf0f1;
-  padding-bottom: 6px;
-  font-size: 1.1rem;
-}
+.hidden { display: none !important; }
 
-.input-group {
+/* Profil-Eingabe Styling */
+.profile-input-group {
   display: flex;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
 }
 
-input[type="text"],
-input[type="number"],
-select {
-  width: 100%;
-  padding: 10px;
+.profile-input-group input {
+  flex: 1;
+  padding: 0.6rem;
+  border-radius: 8px;
   border: 1px solid #ccc;
-  border-radius: 6px;
   font-size: 0.95rem;
 }
 
-button {
-  background-color: #3498db;
-  color: white;
-  border: none;
-  padding: 10px 14px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: bold;
-  transition: background-color 0.2s;
-  font-size: 0.95rem;
+.btn-inline {
+  width: auto !important;
+  margin-top: 0 !important;
+  padding: 0.6rem 1.2rem !important;
 }
 
-button:hover {
-  background-color: #2980b9;
-}
-
-.button-group {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.btn-danger {
-  background-color: #e74c3c;
-  width: 100%;
-  margin-top: 10px;
-}
-.btn-danger:hover { background-color: #c0392b; }
-
-.btn-success {
-  background-color: #2ecc71;
-  width: 100%;
-  margin-top: 10px;
-}
-.btn-success:hover { background-color: #27ae60; }
-
-.btn-small {
-  padding: 6px 10px;
+.active-profile-info {
   font-size: 0.85rem;
-  background-color: #7f8c8d;
-}
-.btn-small:hover { background-color: #95a5a6; }
-
-.hidden {
-  display: none !important;
-}
-
-/* Kamera Scanner Container */
-#reader-container {
-  margin-top: 15px;
-}
-
-#reader {
-  width: 100%;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #000;
-}
-
-/* KONTRAST-FILTER: Erhöht Kontrast & Helligkeit des Kamera-Videostreams
-   gegen Glanzflecken und farbige Hintergründe (z.B. gelbe Etiketten) */
-#reader video {
-  filter: contrast(140%) brightness(105%);
-}
-
-#scan-result {
-  margin-top: 15px;
-  background-color: #eef9ff;
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid #bce8f1;
-}
-
-.slot-selection, .count-selection {
-  margin-top: 10px;
-}
-
-.slot-selection label, .count-selection label {
-  display: block;
-  font-size: 0.85rem;
-  margin-bottom: 4px;
   color: #555;
+  margin: 0.5rem 0 0 0;
 }
 
-/* Behälter Grid */
-.slots-grid {
+/* Buttons */
+.btn {
+  display: block;
+  width: 100%;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.btn-primary { background: var(--primary-color); color: white; }
+.btn-success { background: var(--success-color); color: white; }
+.btn-danger { background: var(--danger-color); color: white; }
+.btn-small { padding: 0.4rem; font-size: 0.8rem; background: #e9ecef; color: #495057; }
+
+/* Grid der 4 Behälter */
+.grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 1rem;
 }
 
 .slot-card {
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  padding: 10px;
-  background: #fafafa;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.filled-slot {
-  border-color: #2ecc71;
-  background-color: #f0fff4;
-}
-
-.empty-slot {
-  border-color: #e74c3c;
-  background-color: #fff5f5;
+  background: white;
+  border-radius: 10px;
+  padding: 0.8rem;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.03);
 }
 
 .slot-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.85rem;
-  font-weight: bold;
-  color: #777;
 }
 
-.slot-body {
-  margin: 8px 0;
-}
+.slot-header h3 { margin: 0; font-size: 0.9rem; color: #666; }
 
-.slot-body h4 {
-  font-size: 0.95rem;
-  color: #2c3e50;
-  word-break: break-word;
-}
-
-.led {
+/* Status-LED Symbol */
+.status-led {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  display: inline-block;
+  background-color: #ccc;
 }
 
-.led.red { background-color: #e74c3c; }
-.led.green { background-color: #2ecc71; }
+.status-led.active-green {
+  background-color: var(--success-color);
+  box-shadow: 0 0 8px var(--success-color);
+}
 
-.led.active-green {
-  background-color: #00ff55;
-  box-shadow: 0 0 10px #00ff55;
+.med-name {
+  font-weight: bold;
+  font-size: 1.05rem;
+  margin: 0.5rem 0;
+  min-height: 2.2em;
+}
+
+.count-display { margin-bottom: 0.5rem; }
+
+.count-number {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: var(--primary-color);
+}
+
+.count-unit { font-size: 0.85rem; color: #777; }
+
+.assign-group {
+  margin: 0.8rem 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.assign-group label { font-size: 0.85rem; margin-bottom: 0.2rem; }
+.assign-group select, .assign-group input { padding: 0.5rem; border-radius: 6px; border: 1px solid #ccc; }
+
+/* Dynamische Status-Farben für Behälter-Kacheln */
+.slot-card.empty-slot {
+  border-left: 5px solid #e74c3c;
+  background-color: #fdf2f2;
+}
+
+.slot-card.filled-slot {
+  border-left: 5px solid #2ecc71;
+  background-color: #f2f9f5;
+}
+
+/* Status-LEDs */
+.status-led {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  background-color: #ccc;
+  transition: background-color 0.3s ease;
+}
+
+.status-led.red {
+  background-color: #e74c3c;
+  box-shadow: 0 0 8px rgba(231, 76, 60, 0.6);
+}
+
+.status-led.green {
+  background-color: #2ecc71;
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
 }
