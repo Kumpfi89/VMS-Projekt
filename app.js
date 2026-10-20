@@ -148,6 +148,10 @@ function listenToCloudData(profileName) {
     return;
   }
 
+  // WICHTIG FÜR DEN ESP32-S3:
+  // Aktives Profil zentral in Firebase unter /activeProfile speichern!
+  database.ref('/activeProfile').set(profileName);
+
   database.ref(`profiles/${profileName}`).on('value', (snapshot) => {
     const data = snapshot.val();
     if (data) {
