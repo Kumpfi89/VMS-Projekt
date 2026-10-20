@@ -5,6 +5,8 @@
   --success-color: #28a745;
   --danger-color: #dc3545;
   --text-color: #333333;
+  --scanner-bg: #f0f7ff;
+  --scanner-border: #d0e1fd;
 }
 
 body {
@@ -41,6 +43,67 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
 }
 
 .hidden { display: none !important; }
+
+/* ==========================================
+   HARDWARE BARCODE SCANNER STATUS CARD
+   ========================================== */
+.scanner-status-card {
+  background: var(--scanner-bg);
+  border: 2px solid var(--scanner-border);
+  border-radius: 12px;
+  padding: 1.2rem;
+  margin-bottom: 1.2rem;
+  text-align: center;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.scanner-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 0.5rem;
+}
+
+.scanner-status-header h3 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+/* Pulsierender grüner Online-Indikator */
+.status-indicator {
+  width: 12px;
+  height: 12px;
+  background-color: var(--success-color);
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 8px rgba(40, 167, 69, 0.6);
+  animation: pulse-green 2s infinite;
+}
+
+@keyframes pulse-green {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 8px rgba(40, 167, 69, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+  }
+}
+
+.scanner-hint {
+  color: #64748b;
+  font-size: 0.88rem;
+  margin: 0.4rem 0 1rem 0;
+  line-height: 1.35;
+}
 
 /* Profil-Eingabe Styling */
 .profile-input-group {
@@ -80,9 +143,16 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
   font-weight: bold;
   cursor: pointer;
   margin-top: 0.5rem;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
 }
 
 .btn-primary { background: var(--primary-color); color: white; }
+.btn-secondary { background: #e2e8f0; color: #1e293b; }
+.btn-secondary:hover { background: #cbd5e1; }
 .btn-success { background: var(--success-color); color: white; }
 .btn-danger { background: var(--danger-color); color: white; }
 .btn-small { padding: 0.4rem; font-size: 0.8rem; background: #e9ecef; color: #495057; }
@@ -100,6 +170,7 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
   padding: 0.8rem;
   border: 1px solid #e0e0e0;
   box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+  transition: background-color 0.3s ease, border-left 0.3s ease;
 }
 
 .slot-header {
@@ -109,19 +180,6 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
 }
 
 .slot-header h3 { margin: 0; font-size: 0.9rem; color: #666; }
-
-/* Status-LED Symbol */
-.status-led {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background-color: #ccc;
-}
-
-.status-led.active-green {
-  background-color: var(--success-color);
-  box-shadow: 0 0 8px var(--success-color);
-}
 
 .med-name {
   font-weight: bold;
@@ -160,14 +218,14 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
   background-color: #f2f9f5;
 }
 
-/* Status-LEDs */
+/* Status-LEDs der Slots */
 .status-led {
   width: 14px;
   height: 14px;
   border-radius: 50%;
   display: inline-block;
   background-color: #ccc;
-  transition: background-color 0.3s ease;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .status-led.red {
@@ -178,4 +236,9 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
 .status-led.green {
   background-color: #2ecc71;
   box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
+}
+
+.status-led.active-green {
+  background-color: var(--success-color);
+  box-shadow: 0 0 12px var(--success-color);
 }

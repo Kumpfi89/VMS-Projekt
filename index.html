@@ -9,9 +9,6 @@
   <!-- Firebase SDKs (v9 Compat - MÜSSEN ganz oben stehen!) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-
-  <!-- HTML5-QRCode Bibliothek für den Barcode/QR-Scan -->
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 <body>
 
@@ -33,20 +30,22 @@
       <p class="active-profile-info">Aktuelles Profil: <strong id="active-profile-name">Sebi</strong></p>
     </section>
     
-    <!-- Bereich 1: Barcode Scanner & Befüll-Assistent -->
+    <!-- Bereich 1: Hardware-Scanner Status & Befüll-Assistent -->
     <section class="card scanner-card">
       <h2>Neues Supplement hinzufügen</h2>
       
-      <!-- Wahlmöglichkeiten für den Nutzer -->
-      <div class="action-buttons" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
-        <button id="btn-start-scan" class="btn btn-primary" style="flex: 1; min-width: 140px;">📷 Barcode scannen</button>
-        <button id="btn-manual-entry" class="btn btn-primary" style="flex: 1; min-width: 140px; background-color: #3498db;">✏️ Name manuell eingeben</button>
-      </div>
-      
-      <!-- Video-Fenster für die Smartphone-Kamera -->
-      <div id="reader-container" class="hidden">
-        <div id="reader"></div>
-        <button id="btn-stop-scan" class="btn btn-danger">Abbrechen</button>
+      <!-- Status-Karte für den Hardware-Barcode-Scanner -->
+      <div class="scanner-status-card">
+        <div class="scanner-status-header">
+          <span class="status-indicator"></span>
+          <h3>Hardware-Scanner bereit</h3>
+        </div>
+        <p class="scanner-hint">
+          Haltet den Tera-Scanner vor das Produkt und drückt den Auslöser. Der Barcode wird automatisch erfasst.
+        </p>
+        <button id="btn-manual-entry" class="btn btn-secondary">
+          ✍️ Produkt manuell eintragen
+        </button>
       </div>
 
       <!-- Anzeigebereich für gescanntes / manuell eingegebenes Produkt -->

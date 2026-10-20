@@ -22,12 +22,7 @@ try {
 
 let currentProfile = "Sebi";
 let slotsData = {};
-let html5QrCode = null;
 let currentScannedName = "";
-
-// Native Scanner Variablen
-let nativeStream = null;
-let nativeInterval = null;
 
 // Helper: Verhindert Abstürze durch Storage-Restrictions
 function getSafeStorage(key, fallback) {
@@ -49,26 +44,12 @@ function setSafeStorage(key, value) {
   }
 }
 
-// Mathe-Check: Mathematische Validierung von EAN-13 Prüfsummen (Modulo 10)
-function isValidEAN13(ean) {
-  if (!/^\d{13}$/.exec(ean)) return false;
-  let sum = 0;
-  for (let i = 0; i < 12; i++) {
-    sum += parseInt(ean.charAt(i), 10) * (i % 2 === 0 ? 1 : 3);
-  }
-  const checkDigit = (10 - (sum % 10)) % 10;
-  return checkDigit === parseInt(ean.charAt(12), 10);
-}
-
 // DOM-Elemente
-let btnStartScan, btnStopScan, readerContainer, scanResult, productNameEl, btnSaveSlot;
+let scanResult, productNameEl, btnSaveSlot;
 let userProfileInput, btnLoadProfile, activeProfileName;
 let btnManualEntry, btnEditName;
 
 document.addEventListener('DOMContentLoaded', () => {
-  btnStartScan = document.getElementById('btn-start-scan');
-  btnStopScan = document.getElementById('btn-stop-scan');
-  readerContainer = document.getElementById('reader-container');
   scanResult = document.getElementById('scan-result');
   productNameEl = document.getElementById('product-name');
   btnSaveSlot = document.getElementById('btn-save-slot');
@@ -85,8 +66,6 @@ document.addEventListener('DOMContentLoaded', () => {
   
   listenToCloudData(currentProfile);
 
-  if (btnStartScan) btnStartScan.addEventListener('click', startCamera);
-  if (btnStopScan) btnStopScan.addEventListener('click', stopCamera);
   if (btnSaveSlot) btnSaveSlot.addEventListener('click', saveProductToSlot);
   
   if (btnLoadProfile) {
@@ -98,10 +77,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 1. Manuelle Eingabe ohne Kamera
+  // 1. Manuelle Eingabe ohne Scanner
   if (btnManualEntry) {
     btnManualEntry.addEventListener('click', () => {
-      stopCamera();
       const inputName = prompt("Name des Präparats / Nahrungsergänzungsmittels eingeben:", "");
       if (inputName && inputName.trim() !== "") {
         currentScannedName = inputName.trim();
@@ -121,7 +99,45 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // 3. HARDWARE BARCODE SCANNER INTEGRATION (HID Tastatur-Emulation)
+  setupHardwareScannerListener();
 });
+
+// Hardware-Scanner Event Listener (Verarbeitet Bluetooth/USB Tastatur-Signale)
+function setupHardwareScannerListener() {
+  let barcodePuffer = "";
+  let lastKeyTime = Date.now();
+
+  document.addEventListener('keydown', (e) => {
+    // Wenn der Nutzer gerade aktiv in ein Textfeld tippt, den Scanner-Puffer ignorieren
+    if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+      return;
+    }
+
+    const currentTime = Date.now();
+
+    // Hardware-Scanner tippen extrem schnell (< 50ms pro Zeichen).
+    // Dauert die Pause zwischen Zeichen länger, handelt es sich um eine menschliche Eingabe.
+    if (currentTime - lastKeyTime > 100) {
+      barcodePuffer = "";
+    }
+    lastKeyTime = currentTime;
+
+    // Enter schließt die Scanner-Übertragung ab
+    if (e.key === 'Enter') {
+      const cleanCode = barcodePuffer.trim();
+      if (cleanCode.length >= 8) {
+        console.log("Scanner-Signal empfangen:", cleanCode);
+        onBarcodeScanned(cleanCode);
+      }
+      barcodePuffer = ""; // Puffer leeren
+    } else if (e.key.length === 1) {
+      // Nur druckbare Zeichen anhängen
+      barcodePuffer += e.key;
+    }
+  });
+}
 
 // Echtzeit-Verbindung zur Firebase Realtime Database
 function listenToCloudData(profileName) {
@@ -151,166 +167,19 @@ function listenToCloudData(profileName) {
   });
 }
 
-// Kamera-Start
-function startCamera() {
-  readerContainer.classList.remove('hidden');
-  scanResult.classList.add('hidden');
-
-  if ('BarcodeDetector' in window) {
-    startNativeHardwareScanner();
-  } else {
-    startHtml5QrcodeScanner();
-  }
-}
-
-// NATIVE HARDWARE-ENGINE (Strikte Formate zur Vermeidung von Fehllesungen)
-async function startNativeHardwareScanner() {
-  let nativeVideo = document.getElementById('native-video');
-  const readerDiv = document.getElementById('reader');
-
-  if (!nativeVideo) {
-    nativeVideo = document.createElement('video');
-    nativeVideo.id = 'native-video';
-    nativeVideo.setAttribute('playsinline', 'true');
-    nativeVideo.style.width = '100%';
-    nativeVideo.style.borderRadius = '8px';
-    nativeVideo.style.background = '#000';
-    readerContainer.insertBefore(nativeVideo, btnStopScan);
-  }
-
-  if (readerDiv) readerDiv.classList.add('hidden');
-  nativeVideo.classList.remove('hidden');
-
-  try {
-    // Nur noch echte Supermarkt-/Medikamenten-Formate zulassen!
-    const barcodeDetector = new BarcodeDetector({
-      formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e']
-    });
-
-    nativeStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: "environment",
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-      }
-    });
-
-    nativeVideo.srcObject = nativeStream;
-    await nativeVideo.play();
-
-    // Optischen Zoom aktivieren
-    try {
-      const track = nativeStream.getVideoTracks()[0];
-      if (track && track.getCapabilities) {
-        const capabilities = track.getCapabilities();
-        if (capabilities && capabilities.zoom) {
-          const targetZoom = Math.min(capabilities.zoom.max, 2.0);
-          await track.applyConstraints({ advanced: [{ zoom: targetZoom }] });
-        }
-      }
-    } catch (e) {
-      console.log("Zoom nicht angewendet:", e);
-    }
-
-    nativeInterval = setInterval(async () => {
-      try {
-        if (nativeVideo.readyState < 2) return;
-
-        const barcodes = await barcodeDetector.detect(nativeVideo);
-        if (barcodes.length > 0) {
-          const code = barcodes[0].rawValue;
-
-          // Falls es ein 13-stelliger EAN ist, Prüfsumme verifizieren
-          if (code.length === 13 && !isValidEAN13(code)) {
-            console.warn("Fehlerhafter EAN-13 Scan ignoriert:", code);
-            return;
-          }
-
-          stopCamera();
-          onBarcodeScanned(code);
-        }
-      } catch (e) {
-        console.error("Native Scan Fehler:", e);
-      }
-    }, 100);
-
-  } catch (err) {
-    console.warn("Native Scanner fehlgeschlagen, schalte auf HTML5 Fallback um:", err);
-    startHtml5QrcodeScanner();
-  }
-}
-
-// Fallback: html5-qrcode
-function startHtml5QrcodeScanner() {
-  const nativeVideo = document.getElementById('native-video');
-  const readerDiv = document.getElementById('reader');
-
-  if (nativeVideo) nativeVideo.classList.add('hidden');
-  if (readerDiv) readerDiv.classList.remove('hidden');
-
-  const formatsToSupport = [
-    Html5QrcodeSupportedFormats.EAN_13,
-    Html5QrcodeSupportedFormats.EAN_8,
-    Html5QrcodeSupportedFormats.UPC_A,
-    Html5QrcodeSupportedFormats.UPC_E
-  ];
-
-  html5QrCode = new Html5Qrcode("reader", { formatsToSupport: formatsToSupport });
-
-  const scanConfig = {
-    fps: 30,
-    qrbox: function(viewfinderWidth, viewfinderHeight) {
-      const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-      return {
-        width: Math.floor(viewfinderWidth * 0.9),
-        height: Math.floor(minEdge * 0.35)
-      };
-    },
-    aspectRatio: 1.0,
-    videoConstraints: {
-      facingMode: "environment"
-    }
-  };
-
-  html5QrCode.start(
-    { facingMode: "environment" },
-    scanConfig,
-    onBarcodeScanned
-  ).catch(err => {
-    alert("Kamera-Fehler: " + err);
-    stopCamera();
-  });
-}
-
-// Kamera stoppen
-function stopCamera() {
-  if (nativeInterval) {
-    clearInterval(nativeInterval);
-    nativeInterval = null;
-  }
-  if (nativeStream) {
-    nativeStream.getTracks().forEach(track => track.stop());
-    nativeStream = null;
-  }
-
-  const nativeVideo = document.getElementById('native-video');
-  if (nativeVideo) nativeVideo.classList.add('hidden');
-
-  if (html5QrCode) {
-    html5QrCode.stop().then(() => {
-      readerContainer.classList.add('hidden');
-    }).catch(() => {
-      readerContainer.classList.add('hidden');
-    });
-  } else {
-    readerContainer.classList.add('hidden');
-  }
-}
-
-// Barcode erkannt -> Prüft Open Food Facts & danach die eigene Firebase-Datenbank
+// Barcode empfangen -> Visuelles Feedback & Produktsuche (Open Food Facts / Firebase)
 function onBarcodeScanned(decodedText) {
-  stopCamera();
-  
+  // Visuelles Aufleuchten der Status-Karte als Bestätigung für den Scan
+  const statusCard = document.querySelector('.scanner-status-card');
+  if (statusCard) {
+    statusCard.style.borderColor = '#28a745';
+    statusCard.style.boxShadow = '0 0 12px rgba(40, 167, 69, 0.4)';
+    setTimeout(() => {
+      statusCard.style.borderColor = '';
+      statusCard.style.boxShadow = '';
+    }, 1000);
+  }
+
   productNameEl.innerText = "Lade Produktdaten...";
   scanResult.classList.remove('hidden');
 
@@ -347,7 +216,7 @@ function onBarcodeScanned(decodedText) {
     });
 }
 
-// Hilfsfunktion: Prüft/Speichert selbsterstellte Barcodes in Firebase Realtime Database
+// Hilfsfunktion: Prüft selbsterstellte Barcodes in Firebase Realtime Database
 function checkCustomDatabase(barcode) {
   if (!database) {
     handleUnknownBarcode(barcode);
@@ -359,9 +228,11 @@ function checkCustomDatabase(barcode) {
       const savedName = snapshot.val();
 
       if (savedName) {
+        // Barcode wurde schon einmal gespeichert!
         currentScannedName = savedName;
         productNameEl.innerText = currentScannedName;
       } else {
+        // Unbekannter Barcode -> Abfragen und in Firebase speichern
         handleUnknownBarcode(barcode);
       }
     })
@@ -381,6 +252,7 @@ function handleUnknownBarcode(barcode) {
       currentScannedName = manualFix.trim();
       productNameEl.innerText = currentScannedName;
 
+      // In Firebase unter custom_barcodes ablegen
       if (database) {
         database.ref(`custom_barcodes/${barcode}`).set(currentScannedName)
           .then(() => {
@@ -398,7 +270,7 @@ function saveProductToSlot() {
   const count = parseInt(document.getElementById('pill-count').value) || 0;
 
   if (!currentScannedName || currentScannedName === "-") {
-    alert("Bitte gib zuerst einen Produktnamen ein oder scanne einen Barcode.");
+    alert("Bitte scann zuerst einen Barcode oder gib einen Namen ein.");
     return;
   }
 
