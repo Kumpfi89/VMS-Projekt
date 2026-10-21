@@ -6,7 +6,7 @@
   <title>Smart Supplement Box Dashboard</title>
   <link rel="stylesheet" href="style.css">
   
-  <!-- Firebase SDKs (v9 Compat - MÜSSEN ganz oben stehen!) -->
+  <!-- Firebase SDKs (v9 Compat) -->
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 </head>
@@ -30,20 +30,16 @@
       <p class="active-profile-info">Aktuelles Profil: <strong id="active-profile-name">Sebi</strong></p>
     </section>
     
-    <!-- Bereich 1: Hardware-Scanner Status & Befüll-Assistent -->
+    <!-- Bereich 1: Befüll-Assistent mit Tera-Scanner Hinweis -->
     <section class="card scanner-card">
       <h2>Neues Supplement hinzufügen</h2>
       
-      <!-- Status-Karte für den Hardware-Barcode-Scanner -->
-      <div class="scanner-status-card">
-        <div class="scanner-status-header">
-          <span class="status-indicator"></span>
-          <h3>Hardware-Scanner bereit</h3>
-        </div>
-        <p class="scanner-hint">
+      <!-- Schlanker Hinweis-Kasten für den Tera-Scanner -->
+      <div class="scanner-status-card" style="padding: 1rem; margin-bottom: 1rem; text-align: center;">
+        <p class="scanner-hint" style="margin: 0 0 0.8rem 0; font-size: 0.95rem; color: #475569;">
           Haltet den Tera-Scanner vor das Produkt und drückt den Auslöser. Der Barcode wird automatisch erfasst.
         </p>
-        <button id="btn-manual-entry" class="btn btn-secondary">
+        <button id="btn-manual-entry" class="btn btn-secondary" style="margin-top: 0;">
           ✍️ Produkt manuell eintragen
         </button>
       </div>
