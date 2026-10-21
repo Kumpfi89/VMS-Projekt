@@ -77,25 +77,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 1. Manuelle Eingabe ohne Scanner
+  // 1. Manuelle Eingabe ohne Scanner -> Live in Firebase veröffentlichen
   if (btnManualEntry) {
     btnManualEntry.addEventListener('click', () => {
       const inputName = prompt("Name des Präparats / Nahrungsergänzungsmittels eingeben:", "");
       if (inputName && inputName.trim() !== "") {
-        currentScannedName = inputName.trim();
-        productNameEl.innerText = currentScannedName;
-        scanResult.classList.remove('hidden');
+        publishCurrentScan(inputName.trim());
       }
     });
   }
 
-  // 2. Produktnamen anpassen
+  // 2. Produktnamen anpassen -> Live in Firebase aktualisieren
   if (btnEditName) {
     btnEditName.addEventListener('click', () => {
       const newName = prompt("Produktname anpassen:", currentScannedName);
       if (newName && newName.trim() !== "") {
-        currentScannedName = newName.trim();
-        productNameEl.innerText = currentScannedName;
+        publishCurrentScan(newName.trim());
       }
     });
   }
@@ -148,10 +145,10 @@ function listenToCloudData(profileName) {
     return;
   }
 
-  // WICHTIG FÜR DEN ESP32-S3:
-  // Aktives Profil zentral in Firebase unter /activeProfile speichern!
+  // Aktives Profil zentral in Firebase sichern (für ESP32-S3)
   database.ref('/activeProfile').set(profileName);
 
+  // A) Behälter-Daten des gewählten Profils in Echtzeit synchronisieren
   database.ref(`profiles/${profileName}`).on('value', (snapshot) => {
     const data = snapshot.val();
     if (data) {
@@ -169,11 +166,35 @@ function listenToCloudData(profileName) {
   }, (error) => {
     alert("Firebase Fehler: " + error.message);
   });
+
+  // B) Live-Synchronisation für aktuell gescannte Produkte (Laptop <-> Smartphone)
+  database.ref('/currentScan').on('value', (snapshot) => {
+    const scanData = snapshot.val();
+    if (scanData && scanData.name) {
+      currentScannedName = scanData.name;
+      if (productNameEl) productNameEl.innerText = currentScannedName;
+      if (scanResult) scanResult.classList.remove('hidden');
+    } else {
+      currentScannedName = "";
+      if (scanResult) scanResult.classList.add('hidden');
+    }
+  });
+}
+
+// Hilfsfunktion: Schreibt das temporäre Scan-Ergebnis live in die Cloud
+function publishCurrentScan(name) {
+  currentScannedName = name;
+  if (database) {
+    database.ref('/currentScan').set({
+      name: name,
+      timestamp: Date.now()
+    });
+  }
 }
 
 // Barcode empfangen -> Visuelles Feedback & Produktsuche (Open Food Facts / Firebase)
 function onBarcodeScanned(decodedText) {
-  // Visuelles Aufleuchten der Status-Karte als Bestätigung für den Scan
+  // Visuelles Aufleuchten der Status-Karte falls im DOM vorhanden
   const statusCard = document.querySelector('.scanner-status-card');
   if (statusCard) {
     statusCard.style.borderColor = '#28a745';
@@ -184,8 +205,8 @@ function onBarcodeScanned(decodedText) {
     }, 1000);
   }
 
-  productNameEl.innerText = "Lade Produktdaten...";
-  scanResult.classList.remove('hidden');
+  if (productNameEl) productNameEl.innerText = "Lade Produktdaten...";
+  if (scanResult) scanResult.classList.remove('hidden');
 
   // 1. Zuerst in Open Food Facts suchen
   fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`)
@@ -208,8 +229,7 @@ function onBarcodeScanned(decodedText) {
       }
 
       if (detectedName) {
-        currentScannedName = detectedName;
-        productNameEl.innerText = currentScannedName;
+        publishCurrentScan(detectedName);
       } else {
         // 2. Falls nicht bei Open Food Facts -> Eigene Firebase-Datenbank prüfen
         checkCustomDatabase(decodedText);
@@ -233,8 +253,7 @@ function checkCustomDatabase(barcode) {
 
       if (savedName) {
         // Barcode wurde schon einmal gespeichert!
-        currentScannedName = savedName;
-        productNameEl.innerText = currentScannedName;
+        publishCurrentScan(savedName);
       } else {
         // Unbekannter Barcode -> Abfragen und in Firebase speichern
         handleUnknownBarcode(barcode);
@@ -247,20 +266,20 @@ function checkCustomDatabase(barcode) {
 
 // Fragt den Nutzer nach dem Namen und speichert den Barcode dauerhaft in Firebase
 function handleUnknownBarcode(barcode) {
-  currentScannedName = `Präparat (EAN: ${barcode})`;
-  productNameEl.innerText = currentScannedName;
+  const fallbackName = `Präparat (EAN: ${barcode})`;
+  publishCurrentScan(fallbackName);
 
   setTimeout(() => {
     const manualFix = prompt(`Barcode ${barcode} ist unbekannt. Wie heißt das Produkt?`, "");
     if (manualFix && manualFix.trim() !== "") {
-      currentScannedName = manualFix.trim();
-      productNameEl.innerText = currentScannedName;
+      const cleanName = manualFix.trim();
+      publishCurrentScan(cleanName);
 
       // In Firebase unter custom_barcodes ablegen
       if (database) {
-        database.ref(`custom_barcodes/${barcode}`).set(currentScannedName)
+        database.ref(`custom_barcodes/${barcode}`).set(cleanName)
           .then(() => {
-            console.log(`Barcode ${barcode} wurde dauerhaft als "${currentScannedName}" in Firebase gespeichert.`);
+            console.log(`Barcode ${barcode} wurde dauerhaft als "${cleanName}" in Firebase gespeichert.`);
           })
           .catch(err => console.error("Fehler beim Speichern des Barcodes:", err));
       }
@@ -268,7 +287,7 @@ function handleUnknownBarcode(barcode) {
   }, 300);
 }
 
-// Speichern in Firebase Realtime Database
+// Speichern in Firebase Realtime Database & Scan-Ebenen leeren
 function saveProductToSlot() {
   const selectedSlot = document.getElementById('slot-select').value;
   const count = parseInt(document.getElementById('pill-count').value) || 0;
@@ -285,7 +304,8 @@ function saveProductToSlot() {
 
   database.ref(`profiles/${currentProfile}`).set(slotsData)
     .then(() => {
-      scanResult.classList.add('hidden');
+      // Nach erfolgreichem Speichern den temporären Scan in Firebase löschen, damit das Feld auf allen Geräten schließt
+      database.ref('/currentScan').remove();
       alert(`Erfolgreich gespeichert für [${currentProfile}]:\n${currentScannedName} in Behälter ${selectedSlot}`);
     })
     .catch(err => alert("Speicherfehler: " + err));
