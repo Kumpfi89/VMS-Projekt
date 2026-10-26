@@ -257,3 +257,46 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
     transform: scale(1.15); 
   }
 }
+
+/* Blinkender grüner Linker Streifen (Einnahme-Erinnerung) */
+.slot-card.due-intake {
+  border-left: 8px solid #22c55e !important;
+  animation: pulse-border-green 1s infinite alternate;
+}
+
+@keyframes pulse-border-green {
+  0% {
+    background-color: #ffffff;
+    border-left-color: #22c55e;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+  }
+  100% {
+    background-color: #f0fdf4; /* Sanfter grüner Hintergrund beim Pulsieren */
+    border-left-color: #16a34a;
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
+  }
+}
+
+/* Gelber/Oranger Linker Streifen (Nachfüll-Warnung 1-5 Stk.) */
+.slot-card.warning-slot {
+  border-left: 6px solid #f59e0b !important;
+  background-color: #fffbeb;
+}
+
+/* Blinkender roter Linker Streifen (Leer / 0 Stk.) */
+.slot-card.empty-blink {
+  border-left: 8px solid #ef4444 !important;
+  animation: pulse-border-red 1s infinite alternate;
+}
+
+@keyframes pulse-border-red {
+  0% {
+    background-color: #ffffff;
+    border-left-color: #ef4444;
+  }
+  100% {
+    background-color: #fef2f2; /* Sanfter roter Hintergrund beim Pulsieren */
+    border-left-color: #dc2626;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.4);
+  }
+}

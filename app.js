@@ -325,7 +325,7 @@ function simulateTakePill(slotId) {
       slotsData[slotId].name = "Leer";
     }
 
-    // 💡 Einnahme für die aktuelle Minute in der Web-App quittieren
+    // Einnahme für die aktuelle Minute in der Web-App quittieren
     const currentTime = getFormattedCurrentTime();
     acknowledgedTimes[slotId] = currentTime;
 
@@ -346,7 +346,7 @@ function simulateTakePill(slotId) {
   }
 }
 
-// UI-Anzeige & virtuelle LEDs synchron mit dem ESP32-S3 ansteuern
+// UI-Anzeige: Virtuelle LEDs & Linker Kachellrand synchron mit dem ESP32-S3 ansteuern
 function updateUI() {
   const currentTime = getFormattedCurrentTime();
 
@@ -368,8 +368,9 @@ function updateUI() {
       if (timesEl) timesEl.innerText = timesDisplay;
 
       if (cardEl && ledEl) {
-        // Alle dynamischen LED-Klassen zurücksetzen
+        // Alle dynamischen LED- und Kachel-Klassen zurücksetzen
         ledEl.classList.remove('green', 'red', 'active-green', 'blink-green', 'blink-red');
+        cardEl.classList.remove('empty-slot', 'filled-slot', 'due-intake', 'warning-slot', 'empty-blink');
 
         // Prüfen, ob die aktuelle Uhrzeit in den eingestellten Einnahmezeiten enthalten ist
         const isDue = timesStr && timesStr.indexOf(currentTime) !== -1;
@@ -377,27 +378,23 @@ function updateUI() {
         // Prüfen, ob für diese Minute bereits in der App "Eingenommen" geklickt wurde
         const alreadyTakenInApp = (acknowledgedTimes[i] === currentTime);
 
-        // ZUSTAND 1: Einnahmezeit erreicht, Tabletten da UND NOCH NICHT quittiert -> GRÜN BLINKT
+        // ZUSTAND 1: Einnahmezeit erreicht, Tabletten da UND NOCH NICHT quittiert -> GRÜNER RAND & LED BLINKEN
         if (isDue && count > 0 && !alreadyTakenInApp) {
           ledEl.classList.add('blink-green');
-          cardEl.classList.remove('empty-slot');
-          cardEl.classList.add('filled-slot');
+          cardEl.classList.add('due-intake');
         }
-        // ZUSTAND 2: 0 Tabletten (Leer) -> ROTE LED BLINKT
+        // ZUSTAND 2: 0 Tabletten (Leer) -> ROTER RAND & LED BLINKEN
         else if (count === 0) {
           ledEl.classList.add('blink-red');
-          cardEl.classList.remove('filled-slot');
-          cardEl.classList.add('empty-slot');
+          cardEl.classList.add('empty-blink');
         }
-        // ZUSTAND 3: 1 bis 5 Tabletten (Nachfüllwarnung) -> ROTE LED DAUERHAFT AN
+        // ZUSTAND 3: 1 bis 5 Tabletten (Nachfüllwarnung) -> ORANGER RAND & ROTE LED DAUERHAFT
         else if (count >= 1 && count <= 5) {
           ledEl.classList.add('red');
-          cardEl.classList.remove('empty-slot');
-          cardEl.classList.add('filled-slot');
+          cardEl.classList.add('warning-slot');
         }
-        // ZUSTAND 4: Normalbetrieb / Nach der Einnahme -> LED AUS
+        // ZUSTAND 4: Normalbetrieb / Nach der Einnahme -> STANDARDRAND (GRÜN DEZENT), LED AUS
         else {
-          cardEl.classList.remove('empty-slot');
           cardEl.classList.add('filled-slot');
         }
       }
@@ -405,7 +402,7 @@ function updateUI() {
   }
 }
 
-// Automatische Sekundenauswertung für zeitgenaue LED-Status-Updates
+// Automatische Sekundenauswertung für zeitgenaue LED- & Rand-Updates
 setInterval(() => {
   updateUI();
 }, 1000);
