@@ -72,32 +72,6 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
   font-weight: 600;
 }
 
-/* Pulsierender grüner Online-Indikator */
-.status-indicator {
-  width: 12px;
-  height: 12px;
-  background-color: var(--success-color);
-  border-radius: 50%;
-  display: inline-block;
-  box-shadow: 0 0 8px rgba(40, 167, 69, 0.6);
-  animation: pulse-green 2s infinite;
-}
-
-@keyframes pulse-green {
-  0% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
-  }
-  70% {
-    transform: scale(1);
-    box-shadow: 0 0 0 8px rgba(40, 167, 69, 0);
-  }
-  100% {
-    transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
-  }
-}
-
 .scanner-hint {
   color: #64748b;
   font-size: 0.88rem;
@@ -184,8 +158,7 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
 .med-name {
   font-weight: bold;
   font-size: 1.05rem;
-  margin: 0.5rem 0;
-  min-height: 2.2em;
+  margin: 0.5rem 0 0.2rem 0;
 }
 
 .count-display { margin-bottom: 0.5rem; }
@@ -228,11 +201,13 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
   transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+/* Rote LED dauerhaft an (1 - 5 Stück Füllstandswarnung) */
 .status-led.red {
   background-color: #e74c3c;
   box-shadow: 0 0 8px rgba(231, 76, 60, 0.6);
 }
 
+/* Grüne LED dauerhaft an */
 .status-led.green {
   background-color: #2ecc71;
   box-shadow: 0 0 8px rgba(46, 204, 113, 0.6);
@@ -241,4 +216,44 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
 .status-led.active-green {
   background-color: var(--success-color);
   box-shadow: 0 0 12px var(--success-color);
+}
+
+/* ==========================================
+   NEU: BLINKENDE LED-ANIMATIONEN (Echtzeit-Synchron mit ESP32-S3)
+   ========================================== */
+
+/* Blinkende Grüne LED für Einnahme-Erinnerung zur vorgegebenen Zeit */
+.status-led.blink-green {
+  background-color: #22c55e;
+  box-shadow: 0 0 12px #22c55e;
+  animation: pulse-green 0.8s infinite alternate;
+}
+
+@keyframes pulse-green {
+  0% { 
+    opacity: 0.2; 
+    transform: scale(0.9); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: scale(1.15); 
+  }
+}
+
+/* Blinkende Rote LED für leeren Behälter (0 Stück) */
+.status-led.blink-red {
+  background-color: #ef4444;
+  box-shadow: 0 0 12px #ef4444;
+  animation: pulse-red 0.8s infinite alternate;
+}
+
+@keyframes pulse-red {
+  0% { 
+    opacity: 0.2; 
+    transform: scale(0.9); 
+  }
+  100% { 
+    opacity: 1; 
+    transform: scale(1.15); 
+  }
 }

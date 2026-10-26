@@ -274,7 +274,6 @@ function saveProductToSlot() {
   const selectedSlot = document.getElementById('slot-select').value;
   const count = parseInt(document.getElementById('pill-count').value) || 0;
 
-  // Alle Eingabefelder für Einnahmezeiten auslesen und leere Einträge herausfiltern
   const timeInputs = document.querySelectorAll('.intake-time-input');
   const timesArray = [];
 
@@ -326,7 +325,18 @@ function simulateTakePill(slotId) {
   }
 }
 
+// Hilfsfunktion: Gibt die aktuelle lokale Uhrzeit im Format HH:MM zurück
+function getFormattedCurrentTime() {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+// UI-Anzeige & virtuelle LEDs synchron mit dem ESP32-S3 ansteuern
 function updateUI() {
+  const currentTime = getFormattedCurrentTime();
+
   for (let i = 1; i <= 4; i++) {
     if (slotsData[i]) {
       const nameEl = document.getElementById(`name-${i}`);
@@ -337,27 +347,49 @@ function updateUI() {
 
       const count = slotsData[i].count || 0;
       const displayName = (count === 0) ? "Leer" : (slotsData[i].name || "Leer");
-      const timesDisplay = (count === 0) ? "" : (slotsData[i].times ? `⏱️ Einnahme: ${slotsData[i].times}` : "⏱️ Keine Zeiten");
+      const timesStr = slotsData[i].times || "";
+      const timesDisplay = (count === 0) ? "" : (timesStr ? `⏱️ Einnahme: ${timesStr}` : "⏱️ Keine Zeiten");
 
       if (nameEl) nameEl.innerText = displayName;
       if (countEl) countEl.innerText = count;
       if (timesEl) timesEl.innerText = timesDisplay;
 
       if (cardEl && ledEl) {
-        if (count > 0) {
+        // Alle dynamischen LED-Klassen zurücksetzen
+        ledEl.classList.remove('green', 'red', 'active-green', 'blink-green', 'blink-red');
+
+        // Prüfen, ob die aktuelle Uhrzeit in den eingestellten Einnahmezeiten enthalten ist
+        const isDue = timesStr && timesStr.indexOf(currentTime) !== -1;
+
+        // ZUSTAND 1: Einnahmezeit erreicht UND Tabletten vorhanden -> GRÜNE LED BLINKT
+        if (isDue && count > 0) {
+          ledEl.classList.add('blink-green');
           cardEl.classList.remove('empty-slot');
           cardEl.classList.add('filled-slot');
-
-          ledEl.classList.remove('red');
-          ledEl.classList.add('green');
-        } else {
+        }
+        // ZUSTAND 2: 0 Tabletten (Leer) -> ROTE LED BLINKT
+        else if (count === 0) {
+          ledEl.classList.add('blink-red');
           cardEl.classList.remove('filled-slot');
           cardEl.classList.add('empty-slot');
-
-          ledEl.classList.remove('green');
+        }
+        // ZUSTAND 3: 1 bis 5 Tabletten (Nachfüllwarnung) -> ROTE LED DAUERHAFT AN
+        else if (count >= 1 && count <= 5) {
           ledEl.classList.add('red');
+          cardEl.classList.remove('empty-slot');
+          cardEl.classList.add('filled-slot');
+        }
+        // ZUSTAND 4: Normalbetrieb (> 5 Tabletten & keine Einnahmezeit) -> LED AUS
+        else {
+          cardEl.classList.remove('empty-slot');
+          cardEl.classList.add('filled-slot');
         }
       }
     }
   }
 }
+
+// Automatische Sekundenauswertung für zeitgenaue LED-Status-Updates in der Web-App
+setInterval(() => {
+  updateUI();
+}, 1000);
