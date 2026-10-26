@@ -29,6 +29,19 @@
       </div>
       <p class="active-profile-info">Aktuelles Profil: <strong id="active-profile-name">Sebi</strong></p>
     </section>
+
+    <!-- NEU: Test-Uhrzeit & Zeitsimulation für den ESP32-S3 (0 - 24 Uhr) -->
+    <section class="card time-simulation-card" style="border-left: 5px solid #0066cc;">
+      <h2>⏱️ System-Uhrzeit & Test-Modus</h2>
+      <p style="font-size: 0.85rem; color: #555;">
+        Gebt hier eine beliebige Test-Uhrzeit ein (00:00 - 24:00 Uhr), um das blinkende Erinnerungssignal der grünen LED am ESP32-S3 sofort zu überprüfen.
+      </p>
+      <div class="profile-input-group">
+        <input type="time" id="simulated-time-input" value="12:45" step="60">
+        <button id="btn-set-time" class="btn btn-primary btn-inline">Uhrzeit setzen</button>
+      </div>
+      <p class="active-profile-info">Aktuell aktive Test-Zeit: <strong id="active-sim-time">12:45 Uhr</strong></p>
+    </section>
     
     <!-- Bereich 1: Befüll-Assistent mit Tera-Scanner Hinweis -->
     <section class="card scanner-card">
@@ -65,6 +78,12 @@
         <div class="assign-group">
           <label for="pill-count">Anzahl Tabletten:</label>
           <input type="number" id="pill-count" value="30" min="1">
+        </div>
+
+        <!-- NEU: Einnahmezeiten Eingabe -->
+        <div class="assign-group" style="margin-top: 0.8rem;">
+          <label for="intake-times">Einnahmezeiten (z. B. 08:00, 12:45, 18:00):</label>
+          <input type="text" id="intake-times" placeholder="08:00, 12:00, 18:00" value="08:00, 12:45, 18:00">
         </div>
 
         <button id="btn-save-slot" class="btn btn-success" style="margin-top: 1rem;">Behälter befüllen & speichern</button>

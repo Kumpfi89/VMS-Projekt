@@ -48,6 +48,7 @@ function setSafeStorage(key, value) {
 let scanResult, productNameEl, btnSaveSlot;
 let userProfileInput, btnLoadProfile, activeProfileName;
 let btnManualEntry, btnEditName;
+let btnSetTime, simTimeInput, activeSimTime, intakeTimesInput;
 
 document.addEventListener('DOMContentLoaded', () => {
   scanResult = document.getElementById('scan-result');
@@ -60,6 +61,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnManualEntry = document.getElementById('btn-manual-entry');
   btnEditName = document.getElementById('btn-edit-name');
+
+  // NEU: Elemente für Zeitsimulation & Einnahmezeiten
+  btnSetTime = document.getElementById('btn-set-time');
+  simTimeInput = document.getElementById('simulated-time-input');
+  activeSimTime = document.getElementById('active-sim-time');
+  intakeTimesInput = document.getElementById('intake-times');
 
   currentProfile = getSafeStorage('smartbox_last_profile', 'Sebi');
   if (userProfileInput) userProfileInput.value = currentProfile;
@@ -77,7 +84,31 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 1. Manuelle Eingabe ohne Scanner -> Live in Firebase veröffentlichen
+  // 1. NEU: Test-Uhrzeit (00:00 - 24:00) live in Firebase setzen
+  if (btnSetTime && simTimeInput) {
+    btnSetTime.addEventListener('click', () => {
+      let chosenTime = simTimeInput.value.trim();
+
+      // Spezialfall 24:00 Uhr -> entspricht 00:00 Uhr
+      if (chosenTime === "24:00") {
+        chosenTime = "00:00";
+      }
+
+      if (!chosenTime) {
+        chosenTime = "12:45";
+      }
+
+      if (activeSimTime) activeSimTime.innerText = `${chosenTime} Uhr`;
+
+      if (database) {
+        database.ref('/system/simulatedTime').set(chosenTime)
+          .then(() => alert(`Test-Uhrzeit für ESP32-S3 auf ${chosenTime} Uhr gesetzt!`))
+          .catch(err => alert("Fehler beim Setzen der Uhrzeit: " + err));
+      }
+    });
+  }
+
+  // 2. Manuelle Eingabe ohne Scanner -> Live in Firebase veröffentlichen
   if (btnManualEntry) {
     btnManualEntry.addEventListener('click', () => {
       const inputName = prompt("Name des Präparats / Nahrungsergänzungsmittels eingeben:", "");
@@ -87,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 2. Produktnamen anpassen -> Live in Firebase aktualisieren
+  // 3. Produktnamen anpassen -> Live in Firebase aktualisieren
   if (btnEditName) {
     btnEditName.addEventListener('click', () => {
       const newName = prompt("Produktname anpassen:", currentScannedName);
@@ -97,40 +128,35 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 3. HARDWARE BARCODE SCANNER INTEGRATION (HID Tastatur-Emulation)
+  // 4. HARDWARE BARCODE SCANNER INTEGRATION
   setupHardwareScannerListener();
 });
 
-// Hardware-Scanner Event Listener (Verarbeitet Bluetooth/USB Tastatur-Signale)
+// Hardware-Scanner Event Listener (Bluetooth/USB Tastatur-Emulation)
 function setupHardwareScannerListener() {
   let barcodePuffer = "";
   let lastKeyTime = Date.now();
 
   document.addEventListener('keydown', (e) => {
-    // Wenn der Nutzer gerade aktiv in ein Textfeld tippt, den Scanner-Puffer ignorieren
     if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
       return;
     }
 
     const currentTime = Date.now();
 
-    // Hardware-Scanner tippen extrem schnell (< 50ms pro Zeichen).
-    // Dauert die Pause zwischen Zeichen länger, handelt es sich um eine menschliche Eingabe.
     if (currentTime - lastKeyTime > 100) {
       barcodePuffer = "";
     }
     lastKeyTime = currentTime;
 
-    // Enter schließt die Scanner-Übertragung ab
     if (e.key === 'Enter') {
       const cleanCode = barcodePuffer.trim();
       if (cleanCode.length >= 8) {
         console.log("Scanner-Signal empfangen:", cleanCode);
         onBarcodeScanned(cleanCode);
       }
-      barcodePuffer = ""; // Puffer leeren
+      barcodePuffer = "";
     } else if (e.key.length === 1) {
-      // Nur druckbare Zeichen anhängen
       barcodePuffer += e.key;
     }
   });
@@ -155,10 +181,10 @@ function listenToCloudData(profileName) {
       slotsData = data;
     } else {
       slotsData = {
-        1: { name: 'Leer', count: 0 },
-        2: { name: 'Leer', count: 0 },
-        3: { name: 'Leer', count: 0 },
-        4: { name: 'Leer', count: 0 }
+        1: { name: 'Leer', count: 0, times: '08:00, 12:45, 18:00' },
+        2: { name: 'Leer', count: 0, times: '08:00, 12:45, 18:00' },
+        3: { name: 'Leer', count: 0, times: '08:00, 12:45, 18:00' },
+        4: { name: 'Leer', count: 0, times: '08:00, 12:45, 18:00' }
       };
       database.ref(`profiles/${profileName}`).set(slotsData);
     }
@@ -179,6 +205,15 @@ function listenToCloudData(profileName) {
       if (scanResult) scanResult.classList.add('hidden');
     }
   });
+
+  // C) Test-Uhrzeit aus Firebase synchronisieren
+  database.ref('/system/simulatedTime').on('value', (snapshot) => {
+    const timeVal = snapshot.val();
+    if (timeVal) {
+      if (simTimeInput) simTimeInput.value = timeVal;
+      if (activeSimTime) activeSimTime.innerText = `${timeVal} Uhr`;
+    }
+  });
 }
 
 // Hilfsfunktion: Schreibt das temporäre Scan-Ergebnis live in die Cloud
@@ -192,9 +227,8 @@ function publishCurrentScan(name) {
   }
 }
 
-// Barcode empfangen -> Visuelles Feedback & Produktsuche (Open Food Facts / Firebase)
+// Barcode empfangen -> Visuelles Feedback & Produktsuche
 function onBarcodeScanned(decodedText) {
-  // Visuelles Aufleuchten der Status-Karte falls im DOM vorhanden
   const statusCard = document.querySelector('.scanner-status-card');
   if (statusCard) {
     statusCard.style.borderColor = '#28a745';
@@ -208,7 +242,6 @@ function onBarcodeScanned(decodedText) {
   if (productNameEl) productNameEl.innerText = "Lade Produktdaten...";
   if (scanResult) scanResult.classList.remove('hidden');
 
-  // 1. Zuerst in Open Food Facts suchen
   fetch(`https://world.openfoodfacts.org/api/v0/product/${decodedText}.json`)
     .then(res => res.json())
     .then(data => {
@@ -231,7 +264,6 @@ function onBarcodeScanned(decodedText) {
       if (detectedName) {
         publishCurrentScan(detectedName);
       } else {
-        // 2. Falls nicht bei Open Food Facts -> Eigene Firebase-Datenbank prüfen
         checkCustomDatabase(decodedText);
       }
     })
@@ -240,7 +272,7 @@ function onBarcodeScanned(decodedText) {
     });
 }
 
-// Hilfsfunktion: Prüft selbsterstellte Barcodes in Firebase Realtime Database
+// Hilfsfunktion: Prüft selbsterstellte Barcodes in Firebase
 function checkCustomDatabase(barcode) {
   if (!database) {
     handleUnknownBarcode(barcode);
@@ -250,12 +282,9 @@ function checkCustomDatabase(barcode) {
   database.ref(`custom_barcodes/${barcode}`).once('value')
     .then((snapshot) => {
       const savedName = snapshot.val();
-
       if (savedName) {
-        // Barcode wurde schon einmal gespeichert!
         publishCurrentScan(savedName);
       } else {
-        // Unbekannter Barcode -> Abfragen und in Firebase speichern
         handleUnknownBarcode(barcode);
       }
     })
@@ -264,7 +293,7 @@ function checkCustomDatabase(barcode) {
     });
 }
 
-// Fragt den Nutzer nach dem Namen und speichert den Barcode dauerhaft in Firebase
+// Unbekannter Barcode
 function handleUnknownBarcode(barcode) {
   const fallbackName = `Präparat (EAN: ${barcode})`;
   publishCurrentScan(fallbackName);
@@ -275,22 +304,20 @@ function handleUnknownBarcode(barcode) {
       const cleanName = manualFix.trim();
       publishCurrentScan(cleanName);
 
-      // In Firebase unter custom_barcodes ablegen
       if (database) {
         database.ref(`custom_barcodes/${barcode}`).set(cleanName)
-          .then(() => {
-            console.log(`Barcode ${barcode} wurde dauerhaft als "${cleanName}" in Firebase gespeichert.`);
-          })
-          .catch(err => console.error("Fehler beim Speichern des Barcodes:", err));
+          .then(() => console.log(`Barcode ${barcode} wurde gespeichert.`))
+          .catch(err => console.error("Fehler beim Speichern:", err));
       }
     }
   }, 300);
 }
 
-// Speichern in Firebase Realtime Database & Scan-Ebenen leeren
+// Speichern in Firebase Realtime Database (Inklusive Einnahmezeiten!)
 function saveProductToSlot() {
   const selectedSlot = document.getElementById('slot-select').value;
   const count = parseInt(document.getElementById('pill-count').value) || 0;
+  const times = intakeTimesInput ? (intakeTimesInput.value.trim() || "08:00, 12:45, 18:00") : "08:00, 12:45, 18:00";
 
   if (!currentScannedName || currentScannedName === "-") {
     alert("Bitte scann zuerst einen Barcode oder gib einen Namen ein.");
@@ -299,14 +326,14 @@ function saveProductToSlot() {
 
   slotsData[selectedSlot] = {
     name: currentScannedName,
-    count: count
+    count: count,
+    times: times // Einnahmezeiten für den ESP32-S3 speichern
   };
 
   database.ref(`profiles/${currentProfile}`).set(slotsData)
     .then(() => {
-      // Nach erfolgreichem Speichern den temporären Scan in Firebase löschen, damit das Feld auf allen Geräten schließt
       database.ref('/currentScan').remove();
-      alert(`Erfolgreich gespeichert für [${currentProfile}]:\n${currentScannedName} in Behälter ${selectedSlot}`);
+      alert(`Erfolgreich gespeichert für [${currentProfile}]:\n${currentScannedName} in Behälter ${selectedSlot}\nZeiten: ${times}`);
     })
     .catch(err => alert("Speicherfehler: " + err));
 }
@@ -343,9 +370,14 @@ function updateUI() {
 
       const count = slotsData[i].count || 0;
       const displayName = (count === 0) ? "Leer" : (slotsData[i].name || "Leer");
+      const timesDisplay = slotsData[i].times ? `⏱️ ${slotsData[i].times}` : "";
 
-      if (nameEl) nameEl.innerText = displayName;
-      if (countEl) countEl.innerText = count;
+      if (nameEl) {
+        nameEl.innerText = displayName;
+      }
+      if (countEl) {
+        countEl.innerText = count;
+      }
 
       if (cardEl && ledEl) {
         if (count > 0) {
