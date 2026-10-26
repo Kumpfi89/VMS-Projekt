@@ -48,7 +48,6 @@ function setSafeStorage(key, value) {
 let scanResult, productNameEl, btnSaveSlot;
 let userProfileInput, btnLoadProfile, activeProfileName;
 let btnManualEntry, btnEditName;
-let btnSetTime, simTimeInput, activeSimTime, intakeTimesInput;
 
 document.addEventListener('DOMContentLoaded', () => {
   scanResult = document.getElementById('scan-result');
@@ -61,12 +60,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnManualEntry = document.getElementById('btn-manual-entry');
   btnEditName = document.getElementById('btn-edit-name');
-
-  // NEU: Elemente für Zeitsimulation & Einnahmezeiten
-  btnSetTime = document.getElementById('btn-set-time');
-  simTimeInput = document.getElementById('simulated-time-input');
-  activeSimTime = document.getElementById('active-sim-time');
-  intakeTimesInput = document.getElementById('intake-times');
 
   currentProfile = getSafeStorage('smartbox_last_profile', 'Sebi');
   if (userProfileInput) userProfileInput.value = currentProfile;
@@ -84,31 +77,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 1. NEU: Test-Uhrzeit (00:00 - 24:00) live in Firebase setzen
-  if (btnSetTime && simTimeInput) {
-    btnSetTime.addEventListener('click', () => {
-      let chosenTime = simTimeInput.value.trim();
-
-      // Spezialfall 24:00 Uhr -> entspricht 00:00 Uhr
-      if (chosenTime === "24:00") {
-        chosenTime = "00:00";
-      }
-
-      if (!chosenTime) {
-        chosenTime = "12:45";
-      }
-
-      if (activeSimTime) activeSimTime.innerText = `${chosenTime} Uhr`;
-
-      if (database) {
-        database.ref('/system/simulatedTime').set(chosenTime)
-          .then(() => alert(`Test-Uhrzeit für ESP32-S3 auf ${chosenTime} Uhr gesetzt!`))
-          .catch(err => alert("Fehler beim Setzen der Uhrzeit: " + err));
-      }
-    });
-  }
-
-  // 2. Manuelle Eingabe ohne Scanner -> Live in Firebase veröffentlichen
+  // Manuelle Eingabe ohne Scanner
   if (btnManualEntry) {
     btnManualEntry.addEventListener('click', () => {
       const inputName = prompt("Name des Präparats / Nahrungsergänzungsmittels eingeben:", "");
@@ -118,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 3. Produktnamen anpassen -> Live in Firebase aktualisieren
+  // Produktnamen anpassen
   if (btnEditName) {
     btnEditName.addEventListener('click', () => {
       const newName = prompt("Produktname anpassen:", currentScannedName);
@@ -128,11 +97,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // 4. HARDWARE BARCODE SCANNER INTEGRATION
+  // Hardware Barcode-Scanner Listener
   setupHardwareScannerListener();
 });
 
-// Hardware-Scanner Event Listener (Bluetooth/USB Tastatur-Emulation)
+// Hardware-Scanner Event Listener
 function setupHardwareScannerListener() {
   let barcodePuffer = "";
   let lastKeyTime = Date.now();
@@ -171,20 +140,20 @@ function listenToCloudData(profileName) {
     return;
   }
 
-  // Aktives Profil zentral in Firebase sichern (für ESP32-S3)
+  // Aktives Profil in Firebase sichern
   database.ref('/activeProfile').set(profileName);
 
-  // A) Behälter-Daten des gewählten Profils in Echtzeit synchronisieren
+  // Behälter-Daten synchronisieren
   database.ref(`profiles/${profileName}`).on('value', (snapshot) => {
     const data = snapshot.val();
     if (data) {
       slotsData = data;
     } else {
       slotsData = {
-        1: { name: 'Leer', count: 0, times: '08:00, 12:45, 18:00' },
-        2: { name: 'Leer', count: 0, times: '08:00, 12:45, 18:00' },
-        3: { name: 'Leer', count: 0, times: '08:00, 12:45, 18:00' },
-        4: { name: 'Leer', count: 0, times: '08:00, 12:45, 18:00' }
+        1: { name: 'Leer', count: 0, times: '08:00, 12:00, 18:00' },
+        2: { name: 'Leer', count: 0, times: '08:00, 12:00, 18:00' },
+        3: { name: 'Leer', count: 0, times: '08:00, 12:00, 18:00' },
+        4: { name: 'Leer', count: 0, times: '08:00, 12:00, 18:00' }
       };
       database.ref(`profiles/${profileName}`).set(slotsData);
     }
@@ -193,7 +162,7 @@ function listenToCloudData(profileName) {
     alert("Firebase Fehler: " + error.message);
   });
 
-  // B) Live-Synchronisation für aktuell gescannte Produkte (Laptop <-> Smartphone)
+  // Live-Synchronisation des aktuellen Scans
   database.ref('/currentScan').on('value', (snapshot) => {
     const scanData = snapshot.val();
     if (scanData && scanData.name) {
@@ -205,18 +174,8 @@ function listenToCloudData(profileName) {
       if (scanResult) scanResult.classList.add('hidden');
     }
   });
-
-  // C) Test-Uhrzeit aus Firebase synchronisieren
-  database.ref('/system/simulatedTime').on('value', (snapshot) => {
-    const timeVal = snapshot.val();
-    if (timeVal) {
-      if (simTimeInput) simTimeInput.value = timeVal;
-      if (activeSimTime) activeSimTime.innerText = `${timeVal} Uhr`;
-    }
-  });
 }
 
-// Hilfsfunktion: Schreibt das temporäre Scan-Ergebnis live in die Cloud
 function publishCurrentScan(name) {
   currentScannedName = name;
   if (database) {
@@ -227,7 +186,6 @@ function publishCurrentScan(name) {
   }
 }
 
-// Barcode empfangen -> Visuelles Feedback & Produktsuche
 function onBarcodeScanned(decodedText) {
   const statusCard = document.querySelector('.scanner-status-card');
   if (statusCard) {
@@ -272,7 +230,6 @@ function onBarcodeScanned(decodedText) {
     });
 }
 
-// Hilfsfunktion: Prüft selbsterstellte Barcodes in Firebase
 function checkCustomDatabase(barcode) {
   if (!database) {
     handleUnknownBarcode(barcode);
@@ -293,7 +250,6 @@ function checkCustomDatabase(barcode) {
     });
 }
 
-// Unbekannter Barcode
 function handleUnknownBarcode(barcode) {
   const fallbackName = `Präparat (EAN: ${barcode})`;
   publishCurrentScan(fallbackName);
@@ -313,11 +269,23 @@ function handleUnknownBarcode(barcode) {
   }, 300);
 }
 
-// Speichern in Firebase Realtime Database (Inklusive Einnahmezeiten!)
+// Speichern der ausgefüllten Einnahmezeiten (1 bis 5 Zeiten)
 function saveProductToSlot() {
   const selectedSlot = document.getElementById('slot-select').value;
   const count = parseInt(document.getElementById('pill-count').value) || 0;
-  const times = intakeTimesInput ? (intakeTimesInput.value.trim() || "08:00, 12:45, 18:00") : "08:00, 12:45, 18:00";
+
+  // Alle Eingabefelder für Einnahmezeiten auslesen und leere Einträge herausfiltern
+  const timeInputs = document.querySelectorAll('.intake-time-input');
+  const timesArray = [];
+
+  timeInputs.forEach(input => {
+    const val = input.value.trim();
+    if (val !== "" && !timesArray.includes(val)) {
+      timesArray.push(val);
+    }
+  });
+
+  const formattedTimes = timesArray.join(', ');
 
   if (!currentScannedName || currentScannedName === "-") {
     alert("Bitte scann zuerst einen Barcode oder gib einen Namen ein.");
@@ -327,18 +295,17 @@ function saveProductToSlot() {
   slotsData[selectedSlot] = {
     name: currentScannedName,
     count: count,
-    times: times // Einnahmezeiten für den ESP32-S3 speichern
+    times: formattedTimes || "08:00"
   };
 
   database.ref(`profiles/${currentProfile}`).set(slotsData)
     .then(() => {
       database.ref('/currentScan').remove();
-      alert(`Erfolgreich gespeichert für [${currentProfile}]:\n${currentScannedName} in Behälter ${selectedSlot}\nZeiten: ${times}`);
+      alert(`Erfolgreich gespeichert für [${currentProfile}]:\n${currentScannedName} in Behälter ${selectedSlot}\nEinnahmezeiten: ${formattedTimes || "Keine festgelegt"}`);
     })
     .catch(err => alert("Speicherfehler: " + err));
 }
 
-// Entnahme simulieren
 function simulateTakePill(slotId) {
   if (slotsData[slotId] && slotsData[slotId].count > 0) {
     slotsData[slotId].count--;
@@ -359,25 +326,22 @@ function simulateTakePill(slotId) {
   }
 }
 
-// UI-Anzeige synchronisieren
 function updateUI() {
   for (let i = 1; i <= 4; i++) {
     if (slotsData[i]) {
       const nameEl = document.getElementById(`name-${i}`);
       const countEl = document.getElementById(`count-${i}`);
+      const timesEl = document.getElementById(`times-${i}`);
       const cardEl = document.getElementById(`slot-card-${i}`);
       const ledEl = document.getElementById(`led-${i}`);
 
       const count = slotsData[i].count || 0;
       const displayName = (count === 0) ? "Leer" : (slotsData[i].name || "Leer");
-      const timesDisplay = slotsData[i].times ? `⏱️ ${slotsData[i].times}` : "";
+      const timesDisplay = (count === 0) ? "" : (slotsData[i].times ? `⏱️ Einnahme: ${slotsData[i].times}` : "⏱️ Keine Zeiten");
 
-      if (nameEl) {
-        nameEl.innerText = displayName;
-      }
-      if (countEl) {
-        countEl.innerText = count;
-      }
+      if (nameEl) nameEl.innerText = displayName;
+      if (countEl) countEl.innerText = count;
+      if (timesEl) timesEl.innerText = timesDisplay;
 
       if (cardEl && ledEl) {
         if (count > 0) {

@@ -30,19 +30,6 @@
       <p class="active-profile-info">Aktuelles Profil: <strong id="active-profile-name">Sebi</strong></p>
     </section>
 
-    <!-- NEU: Test-Uhrzeit & Zeitsimulation für den ESP32-S3 (0 - 24 Uhr) -->
-    <section class="card time-simulation-card" style="border-left: 5px solid #0066cc;">
-      <h2>⏱️ System-Uhrzeit & Test-Modus</h2>
-      <p style="font-size: 0.85rem; color: #555;">
-        Gebt hier eine beliebige Test-Uhrzeit ein (00:00 - 24:00 Uhr), um das blinkende Erinnerungssignal der grünen LED am ESP32-S3 sofort zu überprüfen.
-      </p>
-      <div class="profile-input-group">
-        <input type="time" id="simulated-time-input" value="12:45" step="60">
-        <button id="btn-set-time" class="btn btn-primary btn-inline">Uhrzeit setzen</button>
-      </div>
-      <p class="active-profile-info">Aktuell aktive Test-Zeit: <strong id="active-sim-time">12:45 Uhr</strong></p>
-    </section>
-    
     <!-- Bereich 1: Befüll-Assistent mit Tera-Scanner Hinweis -->
     <section class="card scanner-card">
       <h2>Neues Supplement hinzufügen</h2>
@@ -80,13 +67,34 @@
           <input type="number" id="pill-count" value="30" min="1">
         </div>
 
-        <!-- NEU: Einnahmezeiten Eingabe -->
-        <div class="assign-group" style="margin-top: 0.8rem;">
-          <label for="intake-times">Einnahmezeiten (z. B. 08:00, 12:45, 18:00):</label>
-          <input type="text" id="intake-times" placeholder="08:00, 12:00, 18:00" value="08:00, 12:45, 18:00">
+        <!-- NEU: Bis zu 5 konkrete Einnahmezeiten eintragen -->
+        <div class="assign-group" style="margin-top: 1rem;">
+          <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">Einnahmezeiten (1 bis 5 Zeiten):</label>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 0.5rem;">
+            <div>
+              <span style="font-size: 0.75rem; color: #666;">Zeit 1:</span>
+              <input type="time" class="intake-time-input" value="08:00">
+            </div>
+            <div>
+              <span style="font-size: 0.75rem; color: #666;">Zeit 2 (optional):</span>
+              <input type="time" class="intake-time-input" value="12:00">
+            </div>
+            <div>
+              <span style="font-size: 0.75rem; color: #666;">Zeit 3 (optional):</span>
+              <input type="time" class="intake-time-input" value="18:00">
+            </div>
+            <div>
+              <span style="font-size: 0.75rem; color: #666;">Zeit 4 (optional):</span>
+              <input type="time" class="intake-time-input">
+            </div>
+            <div>
+              <span style="font-size: 0.75rem; color: #666;">Zeit 5 (optional):</span>
+              <input type="time" class="intake-time-input">
+            </div>
+          </div>
         </div>
 
-        <button id="btn-save-slot" class="btn btn-success" style="margin-top: 1rem;">Behälter befüllen & speichern</button>
+        <button id="btn-save-slot" class="btn btn-success" style="margin-top: 1.2rem;">Behälter befüllen & speichern</button>
       </div>
     </section>
 
@@ -102,6 +110,7 @@
             <span class="status-led" id="led-1"></span>
           </div>
           <p class="med-name" id="name-1">Lade Cloud-Daten...</p>
+          <p id="times-1" style="font-size: 0.85rem; color: #64748b; margin: 0.2rem 0 0.8rem 0;">-</p>
           <div class="count-display">
             <span class="count-number" id="count-1">0</span>
             <span class="count-unit">Stk.</span>
@@ -116,6 +125,7 @@
             <span class="status-led" id="led-2"></span>
           </div>
           <p class="med-name" id="name-2">Lade Cloud-Daten...</p>
+          <p id="times-2" style="font-size: 0.85rem; color: #64748b; margin: 0.2rem 0 0.8rem 0;">-</p>
           <div class="count-display">
             <span class="count-number" id="count-2">0</span>
             <span class="count-unit">Stk.</span>
@@ -130,6 +140,7 @@
             <span class="status-led" id="led-3"></span>
           </div>
           <p class="med-name" id="name-3">Lade Cloud-Daten...</p>
+          <p id="times-3" style="font-size: 0.85rem; color: #64748b; margin: 0.2rem 0 0.8rem 0;">-</p>
           <div class="count-display">
             <span class="count-number" id="count-3">0</span>
             <span class="count-unit">Stk.</span>
@@ -144,6 +155,7 @@
             <span class="status-led" id="led-4"></span>
           </div>
           <p class="med-name" id="name-4">Lade Cloud-Daten...</p>
+          <p id="times-4" style="font-size: 0.85rem; color: #64748b; margin: 0.2rem 0 0.8rem 0;">-</p>
           <div class="count-display">
             <span class="count-number" id="count-4">0</span>
             <span class="count-unit">Stk.</span>
