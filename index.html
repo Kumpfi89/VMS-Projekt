@@ -67,7 +67,7 @@
           <input type="number" id="pill-count" value="30" min="1">
         </div>
 
-        <!-- NEU: Bis zu 5 konkrete Einnahmezeiten eintragen -->
+        <!-- Bis zu 5 konkrete Einnahmezeiten eintragen -->
         <div class="assign-group" style="margin-top: 1rem;">
           <label style="font-weight: bold; margin-bottom: 0.5rem; display: block;">Einnahmezeiten (1 bis 5 Zeiten):</label>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 0.5rem;">
@@ -94,7 +94,11 @@
           </div>
         </div>
 
-        <button id="btn-save-slot" class="btn btn-success" style="margin-top: 1.2rem;">Behälter befüllen & speichern</button>
+        <!-- Buttons: Speichern & Abbrechen nebeneinander -->
+        <div style="display: flex; gap: 0.8rem; margin-top: 1.2rem;">
+          <button id="btn-save-slot" class="btn btn-success" style="flex: 2; margin-top: 0;">Behälter befüllen & speichern</button>
+          <button id="btn-cancel-scan" class="btn btn-danger" style="flex: 1; margin-top: 0;">❌ Abbrechen</button>
+        </div>
       </div>
     </section>
 

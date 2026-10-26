@@ -48,7 +48,7 @@ function setSafeStorage(key, value) {
 }
 
 // DOM-Elemente
-let scanResult, productNameEl, btnSaveSlot;
+let scanResult, productNameEl, btnSaveSlot, btnCancelScan;
 let userProfileInput, btnLoadProfile, activeProfileName;
 let btnManualEntry, btnEditName;
 
@@ -56,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
   scanResult = document.getElementById('scan-result');
   productNameEl = document.getElementById('product-name');
   btnSaveSlot = document.getElementById('btn-save-slot');
+  btnCancelScan = document.getElementById('btn-cancel-scan');
 
   userProfileInput = document.getElementById('user-profile-input');
   btnLoadProfile = document.getElementById('btn-load-profile');
@@ -70,6 +71,7 @@ document.addEventListener('DOMContentLoaded', () => {
   listenToCloudData(currentProfile);
 
   if (btnSaveSlot) btnSaveSlot.addEventListener('click', saveProductToSlot);
+  if (btnCancelScan) btnCancelScan.addEventListener('click', cancelScanProcess);
   
   if (btnLoadProfile) {
     btnLoadProfile.addEventListener('click', () => {
@@ -104,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupHardwareScannerListener();
 });
 
-// Hardware-Scanner Event Listener
+// Hardware-Scanner Event Listener (300ms Puffer für USB-Funkempfänger)
 function setupHardwareScannerListener() {
   let barcodePuffer = "";
   let lastKeyTime = Date.now();
@@ -116,12 +118,12 @@ function setupHardwareScannerListener() {
 
     const currentTime = Date.now();
 
-    if (currentTime - lastKeyTime > 100) {
+    if (currentTime - lastKeyTime > 300) {
       barcodePuffer = "";
     }
     lastKeyTime = currentTime;
 
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' || e.key === 'NumpadEnter') {
       const cleanCode = barcodePuffer.trim();
       if (cleanCode.length >= 8) {
         console.log("Scanner-Signal empfangen:", cleanCode);
@@ -308,6 +310,20 @@ function saveProductToSlot() {
     .catch(err => alert("Speicherfehler: " + err));
 }
 
+// Scan-Vorgang abbrechen und zum Startbildschirm zurückkehren
+function cancelScanProcess() {
+  currentScannedName = "";
+  
+  // Aktuellen Scan aus Firebase löschen
+  if (database) {
+    database.ref('/currentScan').remove();
+  }
+
+  // Eingabebereich ausblenden & Anzeigen zurücksetzen
+  if (scanResult) scanResult.classList.add('hidden');
+  if (productNameEl) productNameEl.innerText = "-";
+}
+
 // Hilfsfunktion: Gibt die aktuelle lokale Uhrzeit im Format HH:MM zurück
 function getFormattedCurrentTime() {
   const now = new Date();
@@ -346,7 +362,7 @@ function simulateTakePill(slotId) {
   }
 }
 
-// UI-Anzeige: Virtuelle LEDs & Linker Kachellrand synchron mit dem ESP32-S3 ansteuern
+// UI-Anzeige: Virtuelle LEDs & Linker Kachelrand synchron mit dem ESP32-S3 ansteuern
 function updateUI() {
   const currentTime = getFormattedCurrentTime();
 
