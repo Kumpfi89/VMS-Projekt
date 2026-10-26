@@ -24,6 +24,9 @@ let currentProfile = "Sebi";
 let slotsData = {};
 let currentScannedName = "";
 
+// Speichert pro Behälter (1-4) die Minute (HH:MM), in der in der App "Eingenommen" geklickt wurde
+let acknowledgedTimes = { 1: "", 2: "", 3: "", 4: "" };
+
 // Helper: Verhindert Abstürze durch Storage-Restrictions
 function getSafeStorage(key, fallback) {
   try {
@@ -305,6 +308,15 @@ function saveProductToSlot() {
     .catch(err => alert("Speicherfehler: " + err));
 }
 
+// Hilfsfunktion: Gibt die aktuelle lokale Uhrzeit im Format HH:MM zurück
+function getFormattedCurrentTime() {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+// Entnahme durch Button "Eingenommen"
 function simulateTakePill(slotId) {
   if (slotsData[slotId] && slotsData[slotId].count > 0) {
     slotsData[slotId].count--;
@@ -313,24 +325,25 @@ function simulateTakePill(slotId) {
       slotsData[slotId].name = "Leer";
     }
 
+    // 💡 Einnahme für die aktuelle Minute in der Web-App quittieren
+    const currentTime = getFormattedCurrentTime();
+    acknowledgedTimes[slotId] = currentTime;
+
+    // Kurzes visuelles Aufleuchten der LED
     const ledEl = document.getElementById(`led-${slotId}`);
     if (ledEl) {
       ledEl.classList.add('active-green');
-      setTimeout(() => ledEl.classList.remove('active-green'), 1500);
+      setTimeout(() => ledEl.classList.remove('active-green'), 1000);
     }
 
+    // Nach Firebase schreiben (Synchronisation mit ESP32-S3)
     database.ref(`profiles/${currentProfile}`).set(slotsData);
+    
+    // UI sofort aktualisieren
+    updateUI();
   } else {
     alert(`Behälter ${slotId} ist bereits leer!`);
   }
-}
-
-// Hilfsfunktion: Gibt die aktuelle lokale Uhrzeit im Format HH:MM zurück
-function getFormattedCurrentTime() {
-  const now = new Date();
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutes = String(now.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes}`;
 }
 
 // UI-Anzeige & virtuelle LEDs synchron mit dem ESP32-S3 ansteuern
@@ -361,8 +374,11 @@ function updateUI() {
         // Prüfen, ob die aktuelle Uhrzeit in den eingestellten Einnahmezeiten enthalten ist
         const isDue = timesStr && timesStr.indexOf(currentTime) !== -1;
 
-        // ZUSTAND 1: Einnahmezeit erreicht UND Tabletten vorhanden -> GRÜNE LED BLINKT
-        if (isDue && count > 0) {
+        // Prüfen, ob für diese Minute bereits in der App "Eingenommen" geklickt wurde
+        const alreadyTakenInApp = (acknowledgedTimes[i] === currentTime);
+
+        // ZUSTAND 1: Einnahmezeit erreicht, Tabletten da UND NOCH NICHT quittiert -> GRÜN BLINKT
+        if (isDue && count > 0 && !alreadyTakenInApp) {
           ledEl.classList.add('blink-green');
           cardEl.classList.remove('empty-slot');
           cardEl.classList.add('filled-slot');
@@ -379,7 +395,7 @@ function updateUI() {
           cardEl.classList.remove('empty-slot');
           cardEl.classList.add('filled-slot');
         }
-        // ZUSTAND 4: Normalbetrieb (> 5 Tabletten & keine Einnahmezeit) -> LED AUS
+        // ZUSTAND 4: Normalbetrieb / Nach der Einnahme -> LED AUS
         else {
           cardEl.classList.remove('empty-slot');
           cardEl.classList.add('filled-slot');
@@ -389,7 +405,7 @@ function updateUI() {
   }
 }
 
-// Automatische Sekundenauswertung für zeitgenaue LED-Status-Updates in der Web-App
+// Automatische Sekundenauswertung für zeitgenaue LED-Status-Updates
 setInterval(() => {
   updateUI();
 }, 1000);
