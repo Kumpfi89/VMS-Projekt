@@ -24,8 +24,8 @@ let currentProfile = "Sebi";
 let slotsData = {};
 let currentScannedName = "";
 
-// Speichert pro Behälter (1-4) die Minute (HH:MM), in der in der App "Eingenommen" geklickt wurde
-let acknowledgedTimes = { 1: "", 2: "", 3: "", 4: "" };
+// Speichert pro Behälter (1-6) die Minute (HH:MM), in der in der App "Eingenommen" geklickt wurde
+let acknowledgedTimes = { 1: "", 2: "", 3: "", 4: "", 5: "", 6: "" };
 
 // Helper: Verhindert Abstürze durch Storage-Restrictions
 function getSafeStorage(key, fallback) {
@@ -148,7 +148,7 @@ function listenToCloudData(profileName) {
   // Aktives Profil in Firebase sichern
   database.ref('/activeProfile').set(profileName);
 
-  // Behälter-Daten synchronisieren
+  // Behälter-Daten synchronisieren (Erweitert auf 6 Behälter)
   database.ref(`profiles/${profileName}`).on('value', (snapshot) => {
     const data = snapshot.val();
     if (data) {
@@ -158,7 +158,9 @@ function listenToCloudData(profileName) {
         1: { name: 'Leer', count: 0, times: '08:00, 12:00, 18:00' },
         2: { name: 'Leer', count: 0, times: '08:00, 12:00, 18:00' },
         3: { name: 'Leer', count: 0, times: '08:00, 12:00, 18:00' },
-        4: { name: 'Leer', count: 0, times: '08:00, 12:00, 18:00' }
+        4: { name: 'Leer', count: 0, times: '08:00, 12:00, 18:00' },
+        5: { name: 'Leer', count: 0, times: '08:00, 12:00, 18:00' },
+        6: { name: 'Leer', count: 0, times: '08:00, 12:00, 18:00' }
       };
       database.ref(`profiles/${profileName}`).set(slotsData);
     }
@@ -362,11 +364,11 @@ function simulateTakePill(slotId) {
   }
 }
 
-// UI-Anzeige: Virtuelle LEDs & Linker Kachelrand synchron mit dem ESP32-S3 ansteuern
+// UI-Anzeige: Virtuelle LEDs & Linker Kachelrand synchron mit dem ESP32-S3 ansteuern (Erweitert auf 6 Behälter)
 function updateUI() {
   const currentTime = getFormattedCurrentTime();
 
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= 6; i++) {
     if (slotsData[i]) {
       const nameEl = document.getElementById(`name-${i}`);
       const countEl = document.getElementById(`count-${i}`);

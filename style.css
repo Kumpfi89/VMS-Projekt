@@ -29,7 +29,7 @@ header h1 { margin: 0; font-size: 1.4rem; }
 header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
 
 .container {
-  max-width: 600px;
+  max-width: 800px; /* Erweitert auf 800px für ein schönes 6-Kacheln Grid */
   margin: 0 auto;
   padding: 1rem;
 }
@@ -131,11 +131,19 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
 .btn-danger { background: var(--danger-color); color: white; }
 .btn-small { padding: 0.4rem; font-size: 0.8rem; background: #e9ecef; color: #495057; }
 
-/* Grid der 4 Behälter */
+/* ==========================================
+   GRID DER 6 BEHÄLTER (2 Spalten mobil, 3 Spalten Desktop)
+   ========================================== */
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr); /* Standardmäßig 2 Spalten */
   gap: 1rem;
+}
+
+@media (min-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr); /* Bei größeren Bildschirmen 3 Spalten (2x3 Grid) */
+  }
 }
 
 .slot-card {
@@ -219,7 +227,7 @@ header p { margin: 0.2rem 0 0 0; font-size: 0.85rem; opacity: 0.8; }
 }
 
 /* ==========================================
-   NEU: BLINKENDE LED-ANIMATIONEN (Echtzeit-Synchron mit ESP32-S3)
+   BLINKENDE LED-ANIMATIONEN (Echtzeit-Synchron mit ESP32-S3)
    ========================================== */
 
 /* Blinkende Grüne LED für Einnahme-Erinnerung zur vorgegebenen Zeit */

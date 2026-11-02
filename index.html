@@ -59,6 +59,8 @@
             <option value="2">Behälter 2</option>
             <option value="3">Behälter 3</option>
             <option value="4">Behälter 4</option>
+            <option value="5">Behälter 5</option>
+            <option value="6">Behälter 6</option>
           </select>
         </div>
 
@@ -102,7 +104,7 @@
       </div>
     </section>
 
-    <!-- Bereich 2: Das 4-Kacheln Dashboard der Box -->
+    <!-- Bereich 2: Das 6-Kacheln Dashboard der Box -->
     <section class="dashboard">
       <h2>Übersicht der Behälter</h2>
       <div class="grid">
@@ -165,6 +167,36 @@
             <span class="count-unit">Stk.</span>
           </div>
           <button class="btn btn-small" onclick="simulateTakePill(4)">Eingenommen</button>
+        </div>
+
+        <!-- Behälter 5 -->
+        <div class="slot-card" id="slot-card-5">
+          <div class="slot-header">
+            <h3>Behälter 5</h3>
+            <span class="status-led" id="led-5"></span>
+          </div>
+          <p class="med-name" id="name-5">Lade Cloud-Daten...</p>
+          <p id="times-5" style="font-size: 0.85rem; color: #64748b; margin: 0.2rem 0 0.8rem 0;">-</p>
+          <div class="count-display">
+            <span class="count-number" id="count-5">0</span>
+            <span class="count-unit">Stk.</span>
+          </div>
+          <button class="btn btn-small" onclick="simulateTakePill(5)">Eingenommen</button>
+        </div>
+
+        <!-- Behälter 6 -->
+        <div class="slot-card" id="slot-card-6">
+          <div class="slot-header">
+            <h3>Behälter 6</h3>
+            <span class="status-led" id="led-6"></span>
+          </div>
+          <p class="med-name" id="name-6">Lade Cloud-Daten...</p>
+          <p id="times-6" style="font-size: 0.85rem; color: #64748b; margin: 0.2rem 0 0.8rem 0;">-</p>
+          <div class="count-display">
+            <span class="count-number" id="count-6">0</span>
+            <span class="count-unit">Stk.</span>
+          </div>
+          <button class="btn btn-small" onclick="simulateTakePill(6)">Eingenommen</button>
         </div>
 
       </div>
